@@ -15,6 +15,10 @@ type SecretsResponse = {
   secrets: MaskedZapSecret[];
 };
 
+type EthereumProvider = {
+  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+};
+
 export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly ZapSecretType[] }) {
   const [token, setToken] = useState("");
   const [secrets, setSecrets] = useState<MaskedZapSecret[]>([]);
@@ -57,18 +61,61 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
     await refresh(token);
   }
 
-  async function exchangeWalletProof() {
+  async function connectWalletAndSign() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const ethereum = (window as Window & { ethereum?: EthereumProvider }).ethereum;
+      if (!ethereum) throw new Error("No injected wallet found. Connect with your Thirdweb wallet and paste its proof payload, or install a browser wallet.");
+      const accounts = await ethereum.request({ method: "eth_requestAccounts" }) as string[];
+      const address = accounts[0];
+      if (!address) throw new Error("No wallet account selected.");
+      const nonce = crypto.randomUUID();
+      const issuedAt = new Date().toISOString();
+      const expirationTime = new Date(Date.now() + 1000 * 60 * 10).toISOString();
+      const message = [
+        "Zap Wallet Auth",
+        `Domain: ${window.location.host}`,
+        `Address: ${address}`,
+        "Action: zap-auth",
+        `Nonce: ${nonce}`,
+        `Issued At: ${issuedAt}`,
+        `Expiration Time: ${expirationTime}`,
+      ].join("\n");
+      const signature = await ethereum.request({
+        method: "personal_sign",
+        params: [message, address],
+      }) as string;
+      const payload = JSON.stringify({
+        action: "zap-auth",
+        address,
+        expirationTime,
+        issuedAt,
+        message,
+        nonce,
+        signature,
+      }, null, 2);
+      setWalletPayload(payload);
+      await exchangeWalletProof(payload);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Wallet signing failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function exchangeWalletProof(proofPayload = walletPayload) {
     setLoading(true);
     setMessage(null);
     try {
       const response = await fetch("/api/auth/wallet-proof", {
-        body: walletPayload,
+        body: proofPayload,
         headers: { "content-type": "application/json" },
         method: "POST",
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Wallet proof failed.");
-      const accessToken = payload.access_token ?? payload.session?.access_token ?? payload.token;
+      const responsePayload = await response.json();
+      if (!response.ok) throw new Error(responsePayload.error ?? "Wallet proof failed.");
+      const accessToken = responsePayload.access_token ?? responsePayload.session?.access_token ?? responsePayload.token;
       if (!accessToken) throw new Error("Wallet proof response did not include an access token.");
       setToken(accessToken);
       window.sessionStorage.setItem("zap.supabaseToken", accessToken);
@@ -155,14 +202,18 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
 
         <div className="mt-7 border-zinc-200 border-t pt-5">
           <h3 className="font-semibold">Wallet proof proxy</h3>
-          <p className="mt-1 text-sm text-zinc-600">Paste the JSON payload produced by your Thirdweb wallet signature flow.</p>
+          <p className="mt-1 text-sm text-zinc-600">Sign a Zap wallet proof, or paste the JSON payload produced by your Thirdweb wallet signature flow.</p>
+          <Button className="mt-3 gap-2" disabled={loading} onClick={connectWalletAndSign} variant="outline">
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
+            Connect Wallet and Sign
+          </Button>
           <Textarea
             className="mt-3 min-h-32 font-mono text-xs"
             onChange={(event) => setWalletPayload(event.target.value)}
             placeholder='{"address":"0x...","message":"...","signature":"...","action":"zap-auth"}'
             value={walletPayload}
           />
-          <Button className="mt-3" disabled={!walletPayload || loading} onClick={exchangeWalletProof} variant="outline">
+          <Button className="mt-3" disabled={!walletPayload || loading} onClick={() => exchangeWalletProof()} variant="outline">
             Exchange Proof
           </Button>
         </div>

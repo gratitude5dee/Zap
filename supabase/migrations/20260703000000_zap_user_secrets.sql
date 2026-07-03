@@ -17,6 +17,30 @@ create unique index if not exists user_secrets_user_id_secret_type_idx
 create index if not exists user_secrets_user_id_idx
   on public.user_secrets (user_id);
 
+create table if not exists public.wallet_auth_users (
+  address text primary key check (address ~ '^0x[a-f0-9]{40}$'),
+  user_id uuid not null unique references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.wallet_auth_users enable row level security;
+alter table public.wallet_auth_users force row level security;
+
+drop policy if exists "wallet auth users select own" on public.wallet_auth_users;
+create policy "wallet auth users select own"
+  on public.wallet_auth_users for select
+  using ((select auth.uid()) = user_id);
+
+create table if not exists public.wallet_auth_nonces (
+  nonce text primary key,
+  address text not null references public.wallet_auth_users(address) on delete cascade,
+  used_at timestamptz not null default now()
+);
+
+alter table public.wallet_auth_nonces enable row level security;
+alter table public.wallet_auth_nonces force row level security;
+
 alter table public.user_secrets enable row level security;
 alter table public.user_secrets force row level security;
 

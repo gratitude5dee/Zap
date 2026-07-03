@@ -26,6 +26,15 @@ ZAP_SECRET_REVEAL_TOKEN=<long random value shared with Vercel>
 
 Browser calls may list, save, or delete masked secrets. Plaintext reveal requires both the authenticated user's JWT and `x-zap-server-secret`, so only the Zap server can retrieve keys for a live run.
 
+Deploy `supabase/functions/wallet-proof` for wallet login. Required Supabase secrets:
+
+```bash
+SUPABASE_JWT_SECRET=<project jwt secret>
+ZAP_WALLET_TOKEN_TTL_SECONDS=604800
+```
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are supplied by the Supabase Edge Function runtime. The wallet proof function signs short-lived `authenticated` bearer tokens after verifying a wallet signature and one-time nonce.
+
 ## Secret Types
 
 - `gmi_api_key`
@@ -42,4 +51,5 @@ Do not use legacy `profiles.*_api_key` columns for Zap provider execution.
 
 - `/settings` lets creators connect a Supabase/Thirdweb wallet token and manage BYOK provider keys.
 - `/api/auth/wallet-proof` proxies Thirdweb wallet proof payloads to the Supabase `wallet-proof` function.
+- `supabase/functions/wallet-proof` verifies an EIP-191 wallet signature payload, records nonce use in `wallet_auth_nonces`, creates or reuses a Supabase Auth user mapped in `wallet_auth_users`, and returns a Supabase-compatible bearer token for Zap APIs.
 - `/api/secrets` lists, upserts, and deletes masked user secrets through `zap-user-secrets`.
