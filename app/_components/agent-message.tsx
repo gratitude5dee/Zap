@@ -146,7 +146,7 @@ function InputRequestActions({
 
   return (
     <div className="space-y-3 rounded-md border border-yellow-500/30 bg-yellow-500/5 p-3">
-      <p className="text-muted-foreground text-sm">{inputRequest.prompt}</p>
+      <p className="text-zap-muted text-sm">{inputRequest.prompt}</p>
       {inputResponse ? (
         <p className="font-medium text-sm">
           Responded: {selectedOption?.label ?? inputResponse.text ?? inputResponse.optionId}

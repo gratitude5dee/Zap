@@ -3,6 +3,8 @@
 import { useEveAgent } from "eve/react";
 import { AlertCircleIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import Image from "next/image";
+import Link from "next/link";
 import {
   Conversation,
   ConversationContent,
@@ -52,14 +54,14 @@ export function AgentChat() {
   const handleSubmit = (message: PromptInputMessage) => submitText(message.text);
 
   const composer = (
-    <PromptInput onSubmit={handleSubmit}>
+    <PromptInput className="!rounded-md border border-zap-line bg-white shadow-[0_14px_40px_rgba(7,9,13,0.12)]" onSubmit={handleSubmit}>
       <PromptInputTextarea placeholder="Ask Zap Operator to run, revise, or save a recipe..." />
-      <PromptInputSubmit onStop={agent.stop} status={agent.status} />
+      <PromptInputSubmit className="!rounded-md bg-zap-ink text-white hover:bg-black" onStop={agent.stop} status={agent.status} />
     </PromptInput>
   );
 
   return (
-    <main className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+    <main className="zap-paper-grid flex h-dvh flex-col overflow-hidden text-zap-ink">
       <Header canReset={!isEmpty} onReset={agent.reset} status={agent.status} />
 
       <AnimatePresence>
@@ -70,11 +72,11 @@ export function AgentChat() {
             exit={{ height: 0, opacity: 0 }}
             initial={{ height: 0, opacity: 0 }}
           >
-            <div className="mt-3 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
+            <div className="mt-3 flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
               <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
               <div>
                 <p className="font-medium">Request failed</p>
-                <p className="mt-0.5 text-muted-foreground">{agent.error.message}</p>
+                <p className="mt-0.5 text-zap-muted">{agent.error.message}</p>
               </div>
             </div>
           </motion.div>
@@ -104,8 +106,8 @@ export function AgentChat() {
             ))}
             {awaitingResponse ? (
               <motion.div animate={{ opacity: 1 }} className="w-full" initial={{ opacity: 0 }}>
-                <div className="flex w-fit items-center justify-center rounded-2xl bg-muted/50 px-4 py-3">
-                  <Spinner className="size-4 text-muted-foreground" />
+                <div className="flex w-fit items-center justify-center rounded-md bg-white px-4 py-3">
+                  <Spinner className="size-4 text-zap-muted" />
                 </div>
               </motion.div>
             ) : null}
@@ -125,8 +127,15 @@ export function AgentChat() {
         )}
       >
         {isEmpty ? (
-          <div className="flex flex-col items-center gap-2">
-            <span className="mb-1 text-center text-muted-foreground text-xs uppercase tracking-wide">
+          <div className="flex max-w-2xl flex-col items-center gap-2 text-center">
+            <div className="mb-4 flex size-16 overflow-hidden rounded-md border border-white/20 bg-zap-ink shadow-[0_0_34px_rgba(34,135,255,0.22)]">
+              <Image alt="Zap" className="h-full w-full object-cover" height={96} src="/zaplogo.png" width={96} />
+            </div>
+            <h1 className="font-semibold text-4xl leading-none">Zap Operator</h1>
+            <p className="mb-5 max-w-xl text-sm leading-6 text-zap-muted">
+              Build, inspect, and run Eve-native media recipes from one agent loop.
+            </p>
+            <span className="mb-1 text-center font-mono text-zap-muted text-xs">
               Try asking
             </span>
             {SUGGESTION_ROWS.map((row, rowIndex) => (
@@ -141,7 +150,7 @@ export function AgentChat() {
               >
                 {row.map((suggestion) => (
                   <button
-                    className="shrink-0 cursor-pointer whitespace-nowrap rounded-full border bg-background px-3 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
+                    className="min-h-10 shrink-0 cursor-pointer whitespace-nowrap rounded-md border border-zap-line bg-white px-3 py-1.5 text-zap-muted text-sm transition-colors hover:border-zap-blue/50 hover:text-zap-ink"
                     key={suggestion}
                     onClick={() => void submitText(suggestion)}
                     type="button"
@@ -154,7 +163,7 @@ export function AgentChat() {
           </div>
         ) : null}
         <motion.div
-          className={cn("w-full", isEmpty && "max-w-xl")}
+          className={cn("w-full", isEmpty && "max-w-2xl")}
           layout
           transition={SPRING}
         >
@@ -177,21 +186,21 @@ function Header({
   readonly status: AgentStatus;
 }) {
   return (
-    <header className="sticky top-0 z-10 shrink-0 border-b bg-background/80 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3 sm:px-6">
+    <header className="sticky top-0 z-10 shrink-0 border-zap-line border-b bg-white/88 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
         <button
           aria-label="Start a new chat"
-          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md bg-[#ff6600] font-bold text-sm text-white transition-opacity hover:opacity-80 disabled:pointer-events-none"
+          className="flex size-10 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-white/20 bg-zap-ink transition-opacity hover:opacity-85 disabled:pointer-events-none"
           disabled={!canReset}
           onClick={onReset}
           type="button"
         >
-          Y
+          <Image alt="Zap" className="h-full w-full object-cover" height={64} src="/zaplogo.png" width={64} />
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <button
-              className="cursor-pointer font-semibold text-sm leading-tight transition-colors hover:text-foreground/70 disabled:pointer-events-none"
+              className="cursor-pointer font-semibold text-sm leading-tight transition-colors hover:text-zap-blue disabled:pointer-events-none"
               disabled={!canReset}
               onClick={onReset}
               type="button"
@@ -200,19 +209,23 @@ function Header({
             </button>
             <StatusDot status={status} />
           </div>
-          <p className="text-muted-foreground text-xs leading-snug">
-            Author and run Eve-native generative video recipes with Convex
-            progress, Upstash idempotency, GMI primary routing, and fal fallback
-            on{" "}
-            <a className="text-foreground/80 underline-offset-2 hover:underline" href="https://vercel.com/eve" rel="noreferrer" target="_blank">
+          <p className="text-zap-muted text-xs leading-snug">
+            Author and run Eve-native media recipes with Convex progress, Upstash queues, GMI routing, and fal fallback on{" "}
+            <a className="text-zap-ink underline-offset-2 hover:underline" href="https://vercel.com/eve" rel="noreferrer" target="_blank">
               Vercel Eve
             </a>
             .
           </p>
         </div>
+        <Link
+          className="hidden min-h-10 items-center rounded-md px-3 text-sm text-zap-muted transition hover:bg-zap-fog hover:text-zap-ink sm:inline-flex"
+          href="/docs"
+        >
+          Docs
+        </Link>
         <a
           aria-label="View source on GitHub"
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex size-10 shrink-0 items-center justify-center rounded-md text-zap-muted transition-colors hover:bg-zap-fog hover:text-zap-ink"
           href="https://github.com/gratitude5dee/Zap"
           rel="noreferrer"
           target="_blank"
@@ -240,8 +253,8 @@ function StatusDot({ status }: { readonly status: AgentStatus }) {
       : isLive
         ? "bg-emerald-500"
         : status === "ready"
-          ? "bg-muted-foreground"
-          : "bg-muted-foreground/50";
+          ? "bg-zap-muted"
+          : "bg-zap-muted/50";
 
   return (
     <span className="relative flex size-1.5 shrink-0">

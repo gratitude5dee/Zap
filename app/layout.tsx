@@ -5,8 +5,11 @@ import { ConvexClientProvider } from "./ConvexClientProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Zap",
-  description: "One-click generative content recipes on Eve.",
+  title: {
+    default: "Zap — agent media runtime",
+    template: "%s | Zap",
+  },
+  description: "Agent-first generative content recipes on Eve, Convex, Upstash, and Vercel.",
 };
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {

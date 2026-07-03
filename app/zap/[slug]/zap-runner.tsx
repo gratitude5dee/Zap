@@ -1,6 +1,8 @@
 "use client";
 
 import { CheckCircle2, CircleDollarSign, Film, ImageIcon, Play, Upload, WandSparkles } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { RunProgress } from "@/app/runs/[runId]/run-progress";
@@ -60,22 +62,33 @@ export function ZapRunner({ zap }: { readonly zap: PublicZapSpec }) {
   }
 
   return (
-    <main className="min-h-dvh bg-[#f7f7f2] text-zinc-950">
+    <main className="min-h-dvh bg-zap-paper text-zap-ink">
       <div className="mx-auto grid min-h-dvh w-full max-w-7xl grid-cols-1 lg:grid-cols-[390px_1fr]">
-        <aside className="border-zinc-200 border-r bg-white/80 px-5 py-5 backdrop-blur">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-zinc-950 text-white">
-              <WandSparkles className="size-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-lg leading-tight">Zap</p>
-              <p className="text-zinc-500 text-xs">Eve generative recipe runner</p>
-            </div>
+        <aside className="border-zap-line border-r bg-white px-5 py-5">
+          <div className="flex items-center justify-between gap-3">
+            <Link className="flex min-h-11 items-center gap-3" href="/">
+              <span className="flex size-10 overflow-hidden rounded-md border border-white/20 bg-zap-ink">
+                <Image alt="Zap" className="h-full w-full object-cover" height={64} src="/zaplogo.png" width={64} />
+              </span>
+              <span>
+                <span className="block font-semibold text-lg leading-tight">Zap</span>
+                <span className="text-zap-muted text-xs">creator recipe runner</span>
+              </span>
+            </Link>
+            <WandSparkles className="size-5 text-zap-blue" />
           </div>
 
-          <section className="mt-8 space-y-2">
-            <h1 className="font-semibold text-3xl tracking-normal">{zap.title}</h1>
-            <p className="text-sm text-zinc-600 leading-6">{zap.description}</p>
+          <nav className="mt-5 flex gap-2 text-sm">
+            <Link className="inline-flex min-h-10 items-center rounded-md px-3 text-zap-muted transition hover:bg-zap-fog hover:text-zap-ink" href="/gallery">Gallery</Link>
+            <Link className="inline-flex min-h-10 items-center rounded-md px-3 text-zap-muted transition hover:bg-zap-fog hover:text-zap-ink" href="/docs">Docs</Link>
+          </nav>
+
+          <section className="mt-7 space-y-2">
+            <div>
+              <p className="font-mono text-xs text-zap-muted">{zap.zap}</p>
+              <h1 className="mt-2 font-semibold text-3xl leading-tight">{zap.title}</h1>
+              <p className="mt-2 text-sm text-zap-muted leading-6">{zap.description}</p>
+            </div>
           </section>
 
           <div className="mt-6 grid grid-cols-3 gap-2">
@@ -88,9 +101,9 @@ export function ZapRunner({ zap }: { readonly zap: PublicZapSpec }) {
             {hasImage ? (
               <label className="block">
                 <span className="mb-2 block font-medium text-sm">Selfie / reference image</span>
-                <div className={cn("flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-zinc-50 px-4 py-5 text-center transition hover:bg-zinc-100", imageDataUrl && "border-emerald-400 bg-emerald-50")}>
-                  <Upload className="mb-2 size-5 text-zinc-500" />
-                  <span className="text-sm text-zinc-600">{imageDataUrl ? "Image attached" : "Upload a clear front-facing image"}</span>
+                <div className={cn("flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-zap-line bg-zap-fog px-4 py-5 text-center transition hover:bg-zap-ash", imageDataUrl && "border-zap-blue bg-blue-50")}>
+                  <Upload className="mb-2 size-5 text-zap-muted" />
+                  <span className="text-sm text-zap-muted">{imageDataUrl ? "Image attached" : "Upload a clear front-facing image"}</span>
                   <input
                     accept="image/*"
                     className="sr-only"
@@ -126,11 +139,11 @@ export function ZapRunner({ zap }: { readonly zap: PublicZapSpec }) {
             <label className="flex items-center justify-between gap-3 rounded-md border bg-zinc-50 px-3 py-2">
               <span>
                 <span className="block font-medium text-sm">Live providers</span>
-                <span className="text-zinc-500 text-xs">{live ? "Provider keys and budgets required" : "Mock outputs, zero spend"}</span>
+                <span className="text-zap-muted text-xs">{live ? "Provider keys and budgets required" : "Mock outputs, zero spend"}</span>
               </span>
               <input
                 checked={live}
-                className="size-4 accent-zinc-950"
+                className="size-4 accent-zap-blue"
                 onChange={(event) => setLive(event.target.checked)}
                 type="checkbox"
               />
@@ -146,13 +159,13 @@ export function ZapRunner({ zap }: { readonly zap: PublicZapSpec }) {
 
         <section className="min-w-0 px-5 py-5 lg:px-8">
           <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-            <div className="min-h-[420px] rounded-lg border bg-zinc-950 p-4 text-white">
+            <div className="min-h-[420px] rounded-md border border-white/10 bg-zap-ink p-4 text-white shadow-[0_24px_70px_rgba(2,8,23,0.2)]">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-xl">Output</h2>
-                  <p className="text-sm text-zinc-400">Final video and live run state land here.</p>
+                  <p className="text-sm text-white/55">Final video and live run state land here.</p>
                 </div>
-                <ImageIcon className="size-5 text-zinc-400" />
+                <ImageIcon className="size-5 text-white/50" />
               </div>
               {run?.zapUrl && !isMockOutput ? (
                 <video className="mt-5 aspect-video w-full rounded-md bg-black" controls src={run.zapUrl} />
@@ -163,22 +176,22 @@ export function ZapRunner({ zap }: { readonly zap: PublicZapSpec }) {
                   <p className="mt-2 max-w-md text-sm text-emerald-100/80">The pipeline, budget guard, and run state completed without provider spend.</p>
                 </div>
               ) : (
-                <div className="mt-5 flex aspect-video items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-400">
+                <div className="mt-5 flex aspect-video items-center justify-center rounded-md border border-white/10 bg-white/5 text-white/50">
                   Waiting for Zap.mp4
                 </div>
               )}
             </div>
 
-            <div className="rounded-lg border bg-white p-4">
+            <div className="rounded-md border border-zap-line bg-white p-4">
               <h2 className="font-semibold">Stage Timeline</h2>
               <div className="mt-4 space-y-3">
                 {zap.steps.map((step) => (
-                  <div className="rounded-md border bg-zinc-50 px-3 py-2" key={step.id}>
+                  <div className="rounded-md border border-zap-line bg-zap-fog px-3 py-2" key={step.id}>
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-medium text-sm">{step.id}</span>
-                      <span className="rounded bg-white px-2 py-1 text-[11px] text-zinc-500">{step.kind}</span>
+                      <span className="rounded-md bg-white px-2 py-1 text-[11px] text-zap-muted">{step.kind}</span>
                     </div>
-                    <p className="mt-1 truncate text-zinc-500 text-xs">{step.model ?? "local"}</p>
+                    <p className="mt-1 truncate text-zap-muted text-xs">{step.model ?? "local"}</p>
                   </div>
                 ))}
               </div>
@@ -186,7 +199,7 @@ export function ZapRunner({ zap }: { readonly zap: PublicZapSpec }) {
           </div>
 
           {run ? (
-            <div className="mt-4 rounded-lg border bg-white p-4">
+            <div className="mt-4 rounded-md border border-zap-line bg-white p-4">
               <RunProgress fallbackStatus={run.status} runId={run.runId} />
             </div>
           ) : null}
@@ -198,10 +211,10 @@ export function ZapRunner({ zap }: { readonly zap: PublicZapSpec }) {
 
 function Metric({ icon, label, value }: { readonly icon: ReactNode; readonly label: string; readonly value: string }) {
   return (
-    <div className="rounded-lg border bg-zinc-50 p-3">
-      <div className="flex items-center gap-2 text-zinc-500">
+    <div className="rounded-md border border-zap-line bg-zap-fog p-3">
+      <div className="flex items-center gap-2 text-zap-muted">
         {icon}
-        <span className="text-[11px] uppercase">{label}</span>
+        <span className="text-[11px]">{label}</span>
       </div>
       <p className="mt-2 font-semibold text-sm">{value}</p>
     </div>

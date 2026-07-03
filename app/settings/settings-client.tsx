@@ -176,14 +176,14 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
-      <section className="rounded-lg border bg-white p-5">
+      <section className="rounded-md border border-zap-line bg-white p-5">
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md bg-teal-50 text-teal-800">
+          <div className="flex size-10 items-center justify-center rounded-md bg-zap-ink text-zap-cyan">
             <WalletCards className="size-5" />
           </div>
           <div>
             <h2 className="font-semibold text-xl">Thirdweb Wallet Auth</h2>
-            <p className="text-sm text-zinc-600">Use a Supabase access token from the wallet proof flow.</p>
+            <p className="text-sm text-zap-muted">Use a Supabase access token from the wallet proof flow.</p>
           </div>
         </div>
         <label className="block">
@@ -200,9 +200,9 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
           Connect Vault
         </Button>
 
-        <div className="mt-7 border-zinc-200 border-t pt-5">
+        <div className="mt-7 border-zap-line border-t pt-5">
           <h3 className="font-semibold">Wallet proof proxy</h3>
-          <p className="mt-1 text-sm text-zinc-600">Sign a Zap wallet proof, or paste the JSON payload produced by your Thirdweb wallet signature flow.</p>
+          <p className="mt-1 text-sm text-zap-muted">Sign a Zap wallet proof, or paste the JSON payload produced by your Thirdweb wallet signature flow.</p>
           <Button className="mt-3 gap-2" disabled={loading} onClick={connectWalletAndSign} variant="outline">
             {loading ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
             Connect Wallet and Sign
@@ -219,14 +219,14 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
         </div>
       </section>
 
-      <section className="rounded-lg border bg-white p-5">
+      <section className="rounded-md border border-zap-line bg-white p-5">
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md bg-amber-50 text-amber-800">
+          <div className="flex size-10 items-center justify-center rounded-md bg-zap-amber text-zap-ink">
             <KeyRound className="size-5" />
           </div>
           <div>
             <h2 className="font-semibold text-xl">Provider Secrets</h2>
-            <p className="text-sm text-zinc-600">Stored encrypted in Supabase. Browser reads are masked.</p>
+            <p className="text-sm text-zap-muted">Stored encrypted in Supabase. Browser reads are masked.</p>
           </div>
         </div>
 
@@ -252,10 +252,10 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
           {secretTypes.map((type) => {
             const secret = stored.get(type);
             return (
-              <div className="flex items-center justify-between gap-3 rounded-md border bg-zinc-50 px-3 py-2" key={type}>
+              <div className="flex items-center justify-between gap-3 rounded-md border border-zap-line bg-zap-fog px-3 py-2" key={type}>
                 <div>
                   <p className="font-medium text-sm">{type}</p>
-                  <p className="text-zinc-500 text-xs">{secret ? `stored ${secret.last4 ?? "****"}` : "not stored"}</p>
+                  <p className="text-zap-muted text-xs">{secret ? `stored ${secret.last4 ?? "****"}` : "not stored"}</p>
                 </div>
                 <Button disabled={!secret || loading} onClick={() => deleteSecret(type)} size="icon" variant="ghost">
                   <Trash2 className="size-4" />
@@ -264,7 +264,7 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
             );
           })}
         </div>
-        {message ? <p className="mt-4 rounded-md border bg-zinc-50 px-3 py-2 text-sm text-zinc-700">{message}</p> : null}
+        {message ? <p className="mt-4 rounded-md border border-zap-line bg-zap-fog px-3 py-2 text-sm text-zap-muted">{message}</p> : null}
       </section>
     </div>
   );

@@ -9,6 +9,7 @@ give humans and the authoring agent creative context.
 
 - Next.js app mounted with `withEve`.
 - Public landing page, docs, quickstart, and gallery.
+- `DESIGN.md` visual system for the public site and creator app.
 - Creator view at `/zap/world-cup-entrance`.
 - Dev/agent view at `/studio`.
 - Run detail view at `/runs/:runId`.

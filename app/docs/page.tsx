@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { BookOpen, Braces } from "lucide-react";
+import { Eyebrow, PageShell, SiteNav } from "@/app/_components/zap-chrome";
 
 export const dynamic = "force-static";
 
@@ -34,50 +36,64 @@ export default function DocsPage() {
   }));
 
   return (
-    <main className="min-h-dvh bg-white px-5 py-8 text-zinc-950 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="flex items-center justify-between">
-          <Link className="text-sm text-zinc-600" href="/">Zap</Link>
-          <Link className="rounded-md border px-3 py-2 text-sm" href="/gallery">Gallery</Link>
-        </div>
+    <PageShell className="zap-paper-grid">
+      <div className="mx-auto max-w-7xl px-5 py-5 lg:px-8">
+        <SiteNav />
 
-        <header className="mt-10 border-zinc-200 border-b pb-8">
-          <p className="text-sm font-medium text-teal-800">Docs for humans and agents</p>
-          <h1 className="mt-3 font-semibold text-5xl tracking-normal">Zap Docs</h1>
-          <p className="mt-4 max-w-3xl text-zinc-600 leading-7">
-            The web docs and `zap docs` CLI topics are backed by the same markdown source. Agents can read these topics offline, then validate every recipe with mock runs before touching live provider spend.
-          </p>
+        <header className="mt-12 grid gap-8 border-zap-line border-b pb-10 lg:grid-cols-[1fr_360px]">
+          <div>
+            <Eyebrow tone="blue">
+              <BookOpen className="size-4" />
+              Docs for humans and agents
+            </Eyebrow>
+            <h1 className="mt-4 text-balance font-semibold text-5xl leading-none sm:text-6xl">Zap Docs</h1>
+            <p className="mt-5 max-w-3xl text-pretty leading-7 text-zap-muted">
+              The web docs and `zap docs` CLI topics share the same markdown source. Agents can read these topics offline, then validate each recipe with mock runs before live provider spend.
+            </p>
+          </div>
+          <div className="rounded-md border border-zap-line bg-white p-5">
+            <p className="font-mono text-xs text-zap-muted">quick command</p>
+            <pre className="mt-3 overflow-x-auto rounded-md bg-zap-ink p-4 text-[13px] leading-6 text-zinc-100"><code>{`zap docs zap-spec
+zap docs agents
+zap doctor --json`}</code></pre>
+          </div>
         </header>
 
-        <div className="grid gap-8 py-8 lg:grid-cols-[260px_1fr]">
+        <div className="grid gap-8 py-10 lg:grid-cols-[290px_1fr]">
           <aside className="lg:sticky lg:top-6 lg:self-start">
-            <nav aria-label="Documentation topics" className="grid gap-2">
-              {docs.map((topic) => (
-                <a className="rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950" href={`#${topic.id}`} key={topic.id}>
-                  <span className="block font-medium">{topic.title}</span>
-                  <span className="mt-1 block text-xs leading-5 text-zinc-500">{topic.description}</span>
-                </a>
-              ))}
-            </nav>
+            <div className="rounded-md border border-zap-line bg-white p-3">
+              <p className="mb-2 flex items-center gap-2 px-2 font-medium text-sm">
+                <Braces className="size-4 text-zap-blue" />
+                Topics
+              </p>
+              <nav aria-label="Documentation topics" className="grid gap-1">
+                {docs.map((topic) => (
+                  <a className="rounded-md px-3 py-2 text-sm text-zap-muted transition hover:bg-zap-fog hover:text-zap-ink" href={`#${topic.id}`} key={topic.id}>
+                    <span className="block font-medium text-zap-ink">{topic.title}</span>
+                    <span className="mt-1 block text-xs leading-5">{topic.description}</span>
+                  </a>
+                ))}
+              </nav>
+            </div>
           </aside>
 
-          <div className="grid gap-12">
+          <div className="grid gap-5">
             {docs.map((topic) => (
-              <section className="scroll-mt-8 border-zinc-200 border-b pb-10 last:border-b-0" id={topic.id} key={topic.id}>
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <section className="scroll-mt-8 rounded-md border border-zap-line bg-white p-5 md:p-7" id={topic.id} key={topic.id}>
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-zap-line border-b pb-5">
                   <div>
-                    <p className="font-mono text-xs text-zinc-500">zap docs {topic.id}</p>
-                    <h2 className="mt-2 font-semibold text-3xl tracking-normal">{topic.title}</h2>
+                    <p className="font-mono text-xs text-zap-muted">zap docs {topic.id}</p>
+                    <h2 className="mt-2 font-semibold text-3xl leading-tight">{topic.title}</h2>
                   </div>
-                  <Link className="rounded-md border px-3 py-2 text-sm" href={`/api/skills/zap?format=json`}>Skill JSON</Link>
+                  <Link className="inline-flex min-h-11 items-center rounded-md border border-zap-line px-3 font-medium text-sm transition hover:bg-zap-fog" href="/api/skills/zap?format=json">Skill JSON</Link>
                 </div>
-                <article className="max-w-4xl text-zinc-700">{renderMarkdown(topic.content, topic.id)}</article>
+                <article className="max-w-4xl text-zap-muted">{renderMarkdown(topic.content, topic.id)}</article>
               </section>
             ))}
           </div>
         </div>
       </div>
-    </main>
+    </PageShell>
   );
 }
 
@@ -111,7 +127,7 @@ function renderMarkdown(content: string, scope: string) {
         index += 1;
       }
       blocks.push(
-        <pre className="my-5 overflow-x-auto rounded-lg bg-zinc-950 p-4 text-sm text-zinc-100" key={`${scope}-code-${index}`}>
+        <pre className="my-5 overflow-x-auto rounded-md bg-zap-ink p-4 text-sm text-zinc-100" key={`${scope}-code-${index}`}>
           <code>{code.join("\n")}</code>
         </pre>,
       );
@@ -120,19 +136,19 @@ function renderMarkdown(content: string, scope: string) {
     }
 
     if (line.startsWith("### ")) {
-      blocks.push(<h4 className="mt-6 font-semibold text-xl text-zinc-950" key={`${scope}-h4-${index}`}>{line.slice(4)}</h4>);
+      blocks.push(<h4 className="mt-6 font-semibold text-xl text-zap-ink" key={`${scope}-h4-${index}`}>{line.slice(4)}</h4>);
       index += 1;
       continue;
     }
 
     if (line.startsWith("## ")) {
-      blocks.push(<h3 className="mt-8 font-semibold text-2xl text-zinc-950" key={`${scope}-h3-${index}`}>{line.slice(3)}</h3>);
+      blocks.push(<h3 className="mt-8 font-semibold text-2xl text-zap-ink" key={`${scope}-h3-${index}`}>{line.slice(3)}</h3>);
       index += 1;
       continue;
     }
 
     if (line.startsWith("# ")) {
-      blocks.push(<h3 className="mt-2 font-semibold text-2xl text-zinc-950" key={`${scope}-h2-${index}`}>{line.slice(2)}</h3>);
+      blocks.push(<h3 className="mt-2 font-semibold text-2xl text-zap-ink" key={`${scope}-h2-${index}`}>{line.slice(2)}</h3>);
       index += 1;
       continue;
     }
@@ -187,7 +203,7 @@ function renderInline(text: string) {
   const parts = text.split(/(`[^`]+`)/g);
   return parts.map((part, index) => {
     if (part.startsWith("`") && part.endsWith("`")) {
-      return <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[0.9em] text-zinc-950" key={`${part}-${index}`}>{part.slice(1, -1)}</code>;
+      return <code className="rounded bg-zap-fog px-1 py-0.5 font-mono text-[0.9em] text-zap-ink" key={`${part}-${index}`}>{part.slice(1, -1)}</code>;
     }
     return <span key={`${part}-${index}`}>{part}</span>;
   });

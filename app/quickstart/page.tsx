@@ -1,56 +1,83 @@
-import Link from "next/link";
-import { Bot, CheckCircle2, TerminalSquare } from "lucide-react";
+import { Bot, CheckCircle2, CopyCheck, TerminalSquare } from "lucide-react";
+import { CodeWindow, Eyebrow, PageShell, SiteNav } from "@/app/_components/zap-chrome";
 
 const agents = ["Codex", "Claude Code", "Cursor", "OpenClaw", "Hermes"];
 
-export default function QuickstartPage() {
-  return (
-    <main className="min-h-dvh bg-[#f6f6f0] px-5 py-8 text-zinc-950 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        <div className="flex items-center justify-between">
-          <Link className="text-sm text-zinc-600" href="/">Zap</Link>
-          <Link className="rounded-md border bg-white px-3 py-2 text-sm" href="/docs">Docs</Link>
-        </div>
-        <div className="mt-10 max-w-3xl">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-md border border-teal-200 bg-teal-50 px-3 py-1 text-sm text-teal-900">
-            <Bot className="size-4" />
-            Agent framework quickstart
-          </p>
-          <h1 className="font-semibold text-5xl tracking-normal">Point your agent at Zap.</h1>
-          <p className="mt-4 text-zinc-600 leading-7">Use the project URL, repo, or bundled skills so coding agents can download the framework rules, create recipes, and validate mock runs before live provider spend.</p>
-        </div>
-
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-zinc-200 bg-white p-5">
-            <TerminalSquare className="mb-4 size-5 text-teal-800" />
-            <h2 className="font-semibold text-xl">Install and validate</h2>
-            <pre className="mt-4 overflow-x-auto rounded-md bg-zinc-950 p-4 text-sm text-zinc-100"><code>{`npx @zap-md/cli init my-zap-app
+const install = `npx @zap-md/cli init my-zap-app
 cd my-zap-app
 npx @zap-md/cli new creator-intro
 npx @zap-md/cli validate
-npx @zap-md/cli run agent/skills/zap-creator-intro/Zap.md --json`}</code></pre>
-          </div>
-          <div className="rounded-lg border border-zinc-200 bg-white p-5">
-            <CheckCircle2 className="mb-4 size-5 text-amber-700" />
-            <h2 className="font-semibold text-xl">Agent instruction</h2>
-            <p className="mt-4 text-sm text-zinc-600 leading-6">Read `skills/zap/SKILL.md`, then use `skills/zap-authoring/SKILL.md` before editing any `Zap.md` recipe. Keep provider defaults mock unless the user approves live spend.</p>
-          </div>
-        </div>
+npx @zap-md/cli run agent/skills/zap-creator-intro/Zap.md --json`;
 
-        <div className="mt-5 rounded-lg border border-zinc-200 bg-white p-5">
-          <h2 className="font-semibold text-xl">Agent download URLs</h2>
-          <pre className="mt-4 overflow-x-auto rounded-md bg-zinc-950 p-4 text-sm text-zinc-100"><code>{`Manifest: https://zap.wzrd.tech/api/skills
-Core skill: https://zap.wzrd.tech/api/skills/zap
-Authoring skill: https://zap.wzrd.tech/api/skills/zap-authoring
-JSON mode: https://zap.wzrd.tech/api/skills/zap?format=json`}</code></pre>
-        </div>
+export default function QuickstartPage() {
+  return (
+    <PageShell className="zap-paper-grid">
+      <div className="mx-auto max-w-7xl px-5 py-5 lg:px-8">
+        <SiteNav />
 
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {agents.map((agent) => (
-            <div className="rounded-md border border-zinc-200 bg-white px-3 py-3 text-sm" key={agent}>{agent}</div>
-          ))}
-        </div>
+        <header className="mt-12 grid gap-8 border-zap-line border-b pb-10 lg:grid-cols-[1fr_500px] lg:items-end">
+          <div>
+            <Eyebrow tone="blue">
+              <Bot className="size-4" />
+              Agent framework quickstart
+            </Eyebrow>
+            <h1 className="mt-4 text-balance font-semibold text-5xl leading-none sm:text-6xl">Point your agent at Zap.</h1>
+            <p className="mt-5 max-w-3xl text-pretty leading-7 text-zap-muted">
+              Give the agent a URL, repo, or bundled skill. It can fetch the framework rules, create recipes, validate the spec, and run mock output before any live spend.
+            </p>
+          </div>
+          <CodeWindow label="install" status="dry-run first">
+            {install}
+          </CodeWindow>
+        </header>
+
+        <section className="grid gap-5 py-10 lg:grid-cols-[1fr_420px]">
+          <div className="rounded-md border border-zap-line bg-white p-5 md:p-7">
+            <div className="flex items-start gap-3">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-zap-ink text-zap-cyan">
+                <TerminalSquare className="size-5" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-2xl leading-tight">Agent instruction</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-zap-muted">
+                  Read `skills/zap/SKILL.md`, then use `skills/zap-authoring/SKILL.md` before editing any `Zap.md` recipe. Keep provider defaults mock unless the user approves live spend.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3">
+              <Endpoint label="Manifest" value="https://zap.wzrd.tech/api/skills" />
+              <Endpoint label="Core skill" value="https://zap.wzrd.tech/api/skills/zap" />
+              <Endpoint label="Authoring skill" value="https://zap.wzrd.tech/api/skills/zap-authoring" />
+              <Endpoint label="JSON mode" value="https://zap.wzrd.tech/api/skills/zap?format=json" />
+            </div>
+          </div>
+
+          <div className="rounded-md border border-zap-line bg-zap-ink p-5 text-white">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="size-5 text-zap-cyan" />
+              <h2 className="font-semibold text-xl">Supported agent loops</h2>
+            </div>
+            <div className="mt-5 grid gap-2">
+              {agents.map((agent) => (
+                <div className="flex min-h-12 items-center justify-between rounded-md border border-white/10 bg-white/5 px-3" key={agent}>
+                  <span className="font-medium text-sm">{agent}</span>
+                  <CopyCheck className="size-4 text-white/50" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
-    </main>
+    </PageShell>
+  );
+}
+
+function Endpoint({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <div className="grid gap-2 rounded-md bg-zap-fog px-3 py-3 sm:grid-cols-[150px_1fr] sm:items-center">
+      <span className="font-medium text-sm">{label}</span>
+      <span className="break-all font-mono text-xs text-zap-muted">{value}</span>
+    </div>
   );
 }

@@ -24,13 +24,36 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --color-zap-ink: var(--zap-ink);
+  --color-zap-graphite: var(--zap-graphite);
+  --color-zap-paper: var(--zap-paper);
+  --color-zap-fog: var(--zap-fog);
+  --color-zap-ash: var(--zap-ash);
+  --color-zap-line: var(--zap-line);
+  --color-zap-muted: var(--zap-muted);
+  --color-zap-blue: var(--zap-blue);
+  --color-zap-cyan: var(--zap-cyan);
+  --color-zap-amber: var(--zap-amber);
+  --color-zap-amber-ink: var(--zap-amber-ink);
+  --color-zap-ember: var(--zap-ember);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
 
 :root {
   color-scheme: light;
-  /* Soft neutral page with white elevated surfaces so cards/composer pop. */
+  --zap-ink: #07090d;
+  --zap-graphite: #11151c;
+  --zap-paper: #f4f2ea;
+  --zap-fog: #e9e6dc;
+  --zap-ash: #d9d5c9;
+  --zap-line: #d6d1c4;
+  --zap-muted: #64605a;
+  --zap-blue: #2287ff;
+  --zap-cyan: #7bd7ff;
+  --zap-amber: #f2b441;
+  --zap-amber-ink: #6a3d00;
+  --zap-ember: #ff5c2b;
   --background: oklch(0.971 0 0);
   --foreground: oklch(0.16 0 0);
   --card: oklch(1 0 0);
@@ -49,7 +72,7 @@
   --border: oklch(0.916 0 0);
   --input: oklch(0.916 0 0);
   --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  --radius: 0.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -88,11 +111,52 @@ body {
   min-height: 100%;
   margin: 0;
   background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
+  text-rendering: geometricPrecision;
 }
 
 button,
 input,
 textarea {
   font: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  outline-color: var(--zap-blue);
+}
+
+:focus-visible {
+  outline: 2px solid var(--zap-blue);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--zap-blue) 34%, white);
+  color: var(--zap-ink);
+}
+
+.zap-metal-field {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    #07090d;
+  background-size: 42px 42px;
+}
+
+.zap-paper-grid {
+  background:
+    linear-gradient(90deg, rgba(7, 9, 13, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(7, 9, 13, 0.055) 1px, transparent 1px),
+    var(--zap-paper);
+  background-size: 36px 36px;
+}
+
+.zap-panel-glass {
+  background: color-mix(in oklab, var(--zap-graphite) 86%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
