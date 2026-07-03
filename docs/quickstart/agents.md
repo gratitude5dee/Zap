@@ -15,8 +15,8 @@ https://zap.wzrd.tech/api/skills/zap?format=json
 
 ```text
 Use the Zap skills from https://zap.wzrd.tech/api/skills and validate with:
-npx @wzrd/zap validate
-npx @wzrd/zap run agent/skills/zap-world-cup-entrance/Zap.md --json
+npx @wzrdtech/zap validate
+npx @wzrdtech/zap run agent/skills/zap-world-cup-entrance/Zap.md --json
 ```
 
 ## Claude Code

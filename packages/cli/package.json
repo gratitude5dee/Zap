@@ -1,5 +1,5 @@
 {
-  "name": "@wzrd/zap",
+  "name": "@wzrdtech/zap",
   "version": "0.1.0",
   "private": false,
   "description": "Agent-first CLI for creating, validating, and running Zap recipes.",

@@ -3,11 +3,11 @@ import { CodeWindow, Eyebrow, PageShell, SiteNav } from "@/app/_components/zap-c
 
 const agents = ["Codex", "Claude Code", "Cursor", "OpenClaw", "Hermes"];
 
-const install = `npx @wzrd/zap init my-zap-app
+const install = `npx @wzrdtech/zap init my-zap-app
 cd my-zap-app
-npx @wzrd/zap new creator-intro
-npx @wzrd/zap validate
-npx @wzrd/zap run agent/skills/zap-creator-intro/Zap.md --json`;
+npx @wzrdtech/zap new creator-intro
+npx @wzrdtech/zap validate
+npx @wzrdtech/zap run agent/skills/zap-creator-intro/Zap.md --json`;
 
 export default function QuickstartPage() {
   return (

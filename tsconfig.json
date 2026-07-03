@@ -22,12 +22,12 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@wzrd/agent": ["./packages/agent/src/index.ts"],
-      "@wzrd/agent/*": ["./packages/agent/src/*"],
-      "@wzrd/core": ["./packages/core/src/index.ts"],
-      "@wzrd/core/*": ["./packages/core/src/*"],
-      "@wzrd/providers": ["./packages/providers/src/index.ts"],
-      "@wzrd/providers/*": ["./packages/providers/src/*"]
+      "@wzrdtech/agent": ["./packages/agent/src/index.ts"],
+      "@wzrdtech/agent/*": ["./packages/agent/src/*"],
+      "@wzrdtech/core": ["./packages/core/src/index.ts"],
+      "@wzrdtech/core/*": ["./packages/core/src/*"],
+      "@wzrdtech/providers": ["./packages/providers/src/index.ts"],
+      "@wzrdtech/providers/*": ["./packages/providers/src/*"]
     }
   },
   "include": [

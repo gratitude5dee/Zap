@@ -117,7 +117,7 @@ async function initCommand(args, flags) {
     name: slugify(path.basename(root)),
     private: true,
     devDependencies: {
-      "@wzrd/zap": `^${version}`,
+      "@wzrdtech/zap": `^${version}`,
     },
     scripts: {
       "zap:docs": "zap docs",
@@ -403,7 +403,7 @@ async function infoCommand(flags) {
 }
 
 async function upgradeCommand(flags) {
-  const message = "Upgrade checks are intentionally local in v0.1. Reinstall @wzrd/zap to upgrade.";
+  const message = "Upgrade checks are intentionally local in v0.1. Reinstall @wzrdtech/zap to upgrade.";
   if (flags.json) printJson({ message });
   else console.log(message);
 }

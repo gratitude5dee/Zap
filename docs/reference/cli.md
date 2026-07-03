@@ -1,6 +1,6 @@
 # CLI Reference
 
-The publishable package is `@wzrd/zap`; it exposes the `zap` binary.
+The publishable package is `@wzrdtech/zap`; it exposes the `zap` binary.
 
 ## Commands
 

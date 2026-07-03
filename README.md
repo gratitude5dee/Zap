@@ -18,7 +18,7 @@ give humans and the authoring agent creative context.
   `cronLogs`.
 - Upstash Redis idempotency and provider queue helpers.
 - GMI Cloud video adapter, fal adapter, and deterministic mock adapter behind one provider router.
-- Workspace packages for core schema/planning, provider queues, agent helpers, and the publishable `@wzrd/zap`.
+- Workspace packages for core schema/planning, provider queues, agent helpers, and the publishable `@wzrdtech/zap`.
 
 ## Environment
 

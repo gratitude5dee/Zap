@@ -64,7 +64,7 @@
       "packages/agent": {
         "packageJson": {
           "dependencies": [
-            "npm:@wzrd/core@0.1.0"
+            "npm:@wzrdtech/core@0.1.0"
           ]
         }
       },
@@ -87,7 +87,7 @@
         "packageJson": {
           "dependencies": [
             "npm:@upstash/redis@^1.38.0",
-            "npm:@wzrd/core@0.1.0"
+            "npm:@wzrdtech/core@0.1.0"
           ]
         }
       }

@@ -1,10 +1,10 @@
-# @wzrd/zap
+# @wzrdtech/zap
 
 Agent-first command line tools for Zap recipes.
 
 ```bash
-npx @wzrd/zap init my-zap-app
-npx @wzrd/zap new product-reveal
-npx @wzrd/zap validate agent/skills/zap-product-reveal/Zap.md
-npx @wzrd/zap run agent/skills/zap-product-reveal/Zap.md --json
+npx @wzrdtech/zap init my-zap-app
+npx @wzrdtech/zap new product-reveal
+npx @wzrdtech/zap validate agent/skills/zap-product-reveal/Zap.md
+npx @wzrdtech/zap run agent/skills/zap-product-reveal/Zap.md --json
 ```

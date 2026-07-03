@@ -15,4 +15,4 @@ This project uses the Eve framework. Before writing Eve code, read the relevant 
 - `packages/core`: schema, parser, planning, and skills manifest helpers.
 - `packages/providers`: provider adapter and Upstash queue primitives.
 - `packages/agent`: reusable agent instructions and budget guards.
-- `packages/cli`: publishable `@wzrd/zap` package with the `zap` binary.
+- `packages/cli`: publishable `@wzrdtech/zap` package with the `zap` binary.

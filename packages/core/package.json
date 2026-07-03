@@ -1,5 +1,5 @@
 {
-  "name": "@wzrd/core",
+  "name": "@wzrdtech/core",
   "version": "0.1.0",
   "private": false,
   "description": "Core Zap recipe schema, planning, and registry utilities.",

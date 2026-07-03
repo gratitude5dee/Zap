@@ -46,7 +46,7 @@ describe("zap CLI acceptance", () => {
       expect(skills.ok).toBe(true);
 
       const docs = runZap(project, ["docs", "quickstart"]);
-      expect(docs).toContain("npx @wzrd/zap init demo --non-interactive");
+      expect(docs).toContain("npx @wzrdtech/zap init demo --non-interactive");
 
       expect(runZap(project, ["docs", "zap-spec"])).toContain("# Zap Spec");
       expect(runZap(project, ["docs", "steps"])).toContain("# Steps");
