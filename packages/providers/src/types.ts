@@ -1,4 +1,4 @@
-import type { ZapStepKind } from "@zap-md/core";
+import type { ZapStepKind } from "@wzrd/core";
 
 export type Capability = ZapStepKind;
 

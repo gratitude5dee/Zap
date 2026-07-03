@@ -116,12 +116,16 @@ async function initCommand(args, flags) {
   await writeNewFile(path.join(root, "package.json"), JSON.stringify({
     name: slugify(path.basename(root)),
     private: true,
+    devDependencies: {
+      "@wzrd/zap": `^${version}`,
+    },
     scripts: {
       "zap:docs": "zap docs",
       "zap:doctor": "zap doctor",
       "zap:new": "zap new",
       "zap:run": "zap run",
       "zap:skills": "zap skills check",
+      "zap:status": "zap status",
       "zap:validate": "zap validate",
     },
     type: "module",
@@ -399,7 +403,7 @@ async function infoCommand(flags) {
 }
 
 async function upgradeCommand(flags) {
-  const message = "Upgrade checks are intentionally local in v0.1. Reinstall @zap-md/cli to upgrade.";
+  const message = "Upgrade checks are intentionally local in v0.1. Reinstall @wzrd/zap to upgrade.";
   if (flags.json) printJson({ message });
   else console.log(message);
 }

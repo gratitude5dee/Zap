@@ -1,12 +1,25 @@
 {
-  "name": "@zap-md/cli",
+  "name": "@wzrd/zap",
   "version": "0.1.0",
   "private": false,
   "description": "Agent-first CLI for creating, validating, and running Zap recipes.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "zap": "./bin/zap.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gratitude5dee/Zap.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/gratitude5dee/Zap/issues"
+  },
+  "homepage": "https://zap.wzrd.tech",
   "files": [
     "bin",
     "resources",

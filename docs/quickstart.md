@@ -3,12 +3,13 @@
 Create a lightweight Zap project, scaffold a recipe, validate it, and run a zero-spend mock pipeline.
 
 ```bash
-npx @zap-md/cli init demo --non-interactive
+npx @wzrd/zap init demo --non-interactive
 cd demo
-npx zap validate
-npx zap new my-test
-npx zap run my-test --input PROMPT="A bright launch bumper" --json
-npx zap status
+npm install
+npm run zap:validate
+npm run zap:new -- my-test
+npm run zap:run -- my-test --input PROMPT="A bright launch bumper" --json
+npm run zap:status
 ```
 
 Mock mode fills missing required inputs with deterministic placeholders. Live provider execution requires `--live` plus the provider keys and budget approval.
@@ -16,5 +17,5 @@ Mock mode fills missing required inputs with deterministic placeholders. Live pr
 For coding-agent setup, see:
 
 ```bash
-npx zap docs agents
+npx @wzrd/zap docs agents
 ```

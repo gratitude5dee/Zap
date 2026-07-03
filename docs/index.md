@@ -12,11 +12,11 @@ Zap is a lightweight content agent framework built on Eve. A Zap is a one-shot g
 ## Default Workflow
 
 ```bash
-npx @zap-md/cli init my-zap-app
+npx @wzrd/zap init my-zap-app
 cd my-zap-app
-npx @zap-md/cli new launch-trailer
-npx @zap-md/cli validate
-npx @zap-md/cli run agent/skills/zap-launch-trailer/Zap.md --json
+npx @wzrd/zap new launch-trailer
+npx @wzrd/zap validate
+npx @wzrd/zap run agent/skills/zap-launch-trailer/Zap.md --json
 ```
 
 Mock mode is the default. Use live provider generation only after budgets, keys, and creator approval are in place.

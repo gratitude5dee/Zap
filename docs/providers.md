@@ -12,13 +12,13 @@ Provider priority for v1:
 Provider keys are never required for mock runs:
 
 ```bash
-ZAP_PROVIDER=mock npx @zap-md/cli run world-cup-entrance --json
+ZAP_PROVIDER=mock npx @wzrd/zap run world-cup-entrance --json
 ```
 
 Live runs require explicit approval:
 
 ```bash
-npx @zap-md/cli run world-cup-entrance --live --input SELFIE=./selfie.png
+npx @wzrd/zap run world-cup-entrance --live --input SELFIE=./selfie.png
 ```
 
 Web live runs require wallet auth and user-owned provider keys stored in Supabase:

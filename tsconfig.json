@@ -22,12 +22,12 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@zap-md/agent": ["./packages/agent/src/index.ts"],
-      "@zap-md/agent/*": ["./packages/agent/src/*"],
-      "@zap-md/core": ["./packages/core/src/index.ts"],
-      "@zap-md/core/*": ["./packages/core/src/*"],
-      "@zap-md/providers": ["./packages/providers/src/index.ts"],
-      "@zap-md/providers/*": ["./packages/providers/src/*"]
+      "@wzrd/agent": ["./packages/agent/src/index.ts"],
+      "@wzrd/agent/*": ["./packages/agent/src/*"],
+      "@wzrd/core": ["./packages/core/src/index.ts"],
+      "@wzrd/core/*": ["./packages/core/src/*"],
+      "@wzrd/providers": ["./packages/providers/src/index.ts"],
+      "@wzrd/providers/*": ["./packages/providers/src/*"]
     }
   },
   "include": [

@@ -19,13 +19,13 @@ Budget rules:
 Use mock mode while authoring:
 
 ```bash
-npx @zap-md/cli run zap-world-cup-entrance --json
+npx @wzrd/zap run zap-world-cup-entrance --json
 ```
 
 Use live mode only after the creator has approved spend:
 
 ```bash
-npx @zap-md/cli run zap-world-cup-entrance --live --input SELFIE=./selfie.png
+npx @wzrd/zap run zap-world-cup-entrance --live --input SELFIE=./selfie.png
 ```
 
 If a budget check fails, lower step count, switch models, or raise `budget.cap_usd` with explicit owner approval.

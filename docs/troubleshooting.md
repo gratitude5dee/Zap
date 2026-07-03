@@ -6,7 +6,7 @@ Use a working Node 24 runtime. This repo expects Node `24.x`.
 
 ```bash
 node --version
-npx @zap-md/cli doctor --json
+npx @wzrd/zap doctor --json
 ```
 
 ## `zap validate` Finds No Recipes
@@ -20,7 +20,7 @@ agent/skills/zap-*/Zap.md
 Or pass a recipe directly:
 
 ```bash
-npx @zap-md/cli validate agent/skills/zap-world-cup-entrance/Zap.md
+npx @wzrd/zap validate agent/skills/zap-world-cup-entrance/Zap.md
 ```
 
 ## Live Run Refuses To Start

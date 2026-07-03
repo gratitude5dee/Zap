@@ -19,7 +19,7 @@ import {
 import { CodeWindow, Eyebrow, PageShell, SiteNav, TextLink } from "@/app/_components/zap-chrome";
 import { listZapSpecs } from "@/lib/zap-files";
 
-const cliProof = `npx @zap-md/cli init match-day
+const cliProof = `npx @wzrd/zap init match-day
 cd match-day
 zap new world-cup-entrance
 zap validate

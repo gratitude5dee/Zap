@@ -1,5 +1,5 @@
 {
-  "name": "@zap-md/providers",
+  "name": "@wzrd/providers",
   "version": "0.1.0",
   "private": false,
   "description": "Provider adapters and queue helpers for Zap runtimes.",
@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",
-    "@zap-md/core": "0.1.0"
+    "@wzrd/core": "0.1.0"
   },
   "engines": {
     "node": "24.x"
