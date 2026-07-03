@@ -2,10 +2,19 @@
 
 Point your coding agent at the Zap project URL or repo, then ask it to install or read the Zap skills before editing recipes.
 
+Machine-readable skill registry:
+
+```text
+https://zap.wzrd.tech/api/skills
+https://zap.wzrd.tech/api/skills/zap
+https://zap.wzrd.tech/api/skills/zap-authoring
+https://zap.wzrd.tech/api/skills/zap?format=json
+```
+
 ## Codex
 
 ```text
-Use the Zap skills from https://zap.wzrd.tech/quickstart and validate with:
+Use the Zap skills from https://zap.wzrd.tech/api/skills and validate with:
 npx @zap-md/cli validate
 npx @zap-md/cli run agent/skills/zap-world-cup-entrance/Zap.md --json
 ```

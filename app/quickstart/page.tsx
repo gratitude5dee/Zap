@@ -37,6 +37,14 @@ npx @zap-md/cli run agent/skills/zap-creator-intro/Zap.md --json`}</code></pre>
           </div>
         </div>
 
+        <div className="mt-5 rounded-lg border border-zinc-200 bg-white p-5">
+          <h2 className="font-semibold text-xl">Agent download URLs</h2>
+          <pre className="mt-4 overflow-x-auto rounded-md bg-zinc-950 p-4 text-sm text-zinc-100"><code>{`Manifest: https://zap.wzrd.tech/api/skills
+Core skill: https://zap.wzrd.tech/api/skills/zap
+Authoring skill: https://zap.wzrd.tech/api/skills/zap-authoring
+JSON mode: https://zap.wzrd.tech/api/skills/zap?format=json`}</code></pre>
+        </div>
+
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {agents.map((agent) => (
             <div className="rounded-md border border-zinc-200 bg-white px-3 py-3 text-sm" key={agent}>{agent}</div>
