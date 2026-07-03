@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { verifyMessage } from "https://esm.sh/ethers@6.15.0";
-import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 const corsHeaders = {
   "access-control-allow-headers": "authorization, apikey, content-type",
@@ -18,21 +17,19 @@ Deno.serve(async (request: Request) => {
     const proof = normalizeProof(body);
     verifyWalletProof(proof);
 
-    const admin = createClient(requiredEnv("SUPABASE_URL"), supabaseSecretKey());
-    const user = await getOrCreateWalletUser(admin, proof.address);
+    const supabaseUrl = requiredEnv("SUPABASE_URL");
+    const admin = createClient(supabaseUrl, supabaseSecretKey());
+    const password = await walletPassword(proof.address);
+    const user = await getOrCreateWalletUser(admin, proof.address, password);
     await recordNonce(admin, proof.address, proof.nonce);
 
-    const expiresIn = Number(Deno.env.get("ZAP_WALLET_TOKEN_TTL_SECONDS") ?? 60 * 60 * 24 * 7);
-    const accessToken = await signSupabaseAccessToken({
-      address: proof.address,
-      email: walletEmail(proof.address),
-      expiresIn,
-      userId: user.id,
-    });
+    const session = await createWalletSession(supabaseUrl, proof.address, password);
+    const expiresIn = Number(session.expires_in ?? Deno.env.get("ZAP_WALLET_TOKEN_TTL_SECONDS") ?? 60 * 60 * 24 * 7);
 
     return json({
-      access_token: accessToken,
+      access_token: session.access_token,
       expires_in: expiresIn,
+      refresh_token: session.refresh_token,
       token_type: "bearer",
       user: {
         id: user.id,
@@ -81,7 +78,7 @@ function verifyWalletProof(proof: ReturnType<typeof normalizeProof>) {
   }
 }
 
-async function getOrCreateWalletUser(admin, address: string) {
+async function getOrCreateWalletUser(admin, address: string, password: string) {
   const { data: existing, error: existingError } = await admin
     .from("wallet_auth_users")
     .select("user_id")
@@ -91,11 +88,11 @@ async function getOrCreateWalletUser(admin, address: string) {
   if (existing?.user_id) {
     const { data, error } = await admin.auth.admin.getUserById(existing.user_id);
     if (error) throw error;
-    if (data?.user) return data.user;
+    if (data?.user) return await updateWalletUser(admin, data.user, address, password);
   }
 
   const email = walletEmail(address);
-  const created = await createWalletUser(admin, address, email);
+  const created = await createWalletUser(admin, address, email, password);
   const { error: linkError } = await admin
     .from("wallet_auth_users")
     .upsert({ address, user_id: created.id }, { onConflict: "address" });
@@ -103,10 +100,11 @@ async function getOrCreateWalletUser(admin, address: string) {
   return created;
 }
 
-async function createWalletUser(admin, address: string, email: string) {
+async function createWalletUser(admin, address: string, email: string, password: string) {
   const { data, error } = await admin.auth.admin.createUser({
     email,
     email_confirm: true,
+    password,
     user_metadata: {
       provider: "thirdweb",
       wallet_address: address,
@@ -120,7 +118,21 @@ async function createWalletUser(admin, address: string, email: string) {
   if (listError) throw listError;
   const found = listed.users.find((user) => user.email?.toLowerCase() === email);
   if (!found) throw error;
-  return found;
+  return await updateWalletUser(admin, found, address, password);
+}
+
+async function updateWalletUser(admin, user, address: string, password: string) {
+  const { data, error } = await admin.auth.admin.updateUserById(user.id, {
+    email_confirm: true,
+    password,
+    user_metadata: {
+      ...user.user_metadata,
+      provider: "thirdweb",
+      wallet_address: address,
+    },
+  });
+  if (error) throw error;
+  return data?.user ?? user;
 }
 
 async function recordNonce(admin, address: string, nonce: string) {
@@ -133,39 +145,33 @@ async function recordNonce(admin, address: string, nonce: string) {
   }
 }
 
-async function signSupabaseAccessToken({
-  address,
-  email,
-  expiresIn,
-  userId,
-}: {
-  address: string;
-  email: string;
-  expiresIn: number;
-  userId: string;
-}) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(requiredEnv("SUPABASE_JWT_SECRET")),
-    { hash: "SHA-256", name: "HMAC" },
-    false,
-    ["sign", "verify"],
-  );
-  return create(
-    { alg: "HS256", typ: "JWT" },
-    {
-      aud: "authenticated",
-      email,
-      exp: getNumericDate(expiresIn),
-      role: "authenticated",
-      sub: userId,
-      user_metadata: {
-        provider: "thirdweb",
-        wallet_address: address,
-      },
+async function createWalletSession(supabaseUrl: string, address: string, password: string) {
+  const client = createClient(supabaseUrl, supabaseSecretKey(), {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-    key,
-  );
+  });
+  const { data, error } = await client.auth.signInWithPassword({
+    email: walletEmail(address),
+    password,
+  });
+  if (error || !data.session?.access_token) throw new Error(error?.message ?? "Could not create Supabase wallet session.");
+  return data.session;
+}
+
+async function walletPassword(address: string) {
+  const secret = requiredEnv("ZAP_WALLET_AUTH_SECRET");
+  const material = new TextEncoder().encode(`${secret}:${address}`);
+  const digest = await crypto.subtle.digest("SHA-256", material);
+  return `zap_${encodeBase64Url(new Uint8Array(digest))}`;
+}
+
+function encodeBase64Url(bytes: Uint8Array) {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 function extractMessageField(message: string, field: string) {

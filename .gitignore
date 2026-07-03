@@ -5,6 +5,7 @@ node_modules
 .vercel
 .workflow-data
 .zap
+supabase/.temp
 .next
 .output
 .nitro

@@ -7,7 +7,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Supabase public env is not configured." }, { status: 500 });
   }
 
-  const response = await fetch(`${url.replace(/\/$/, "")}/functions/v1/wallet-proof`, {
+  const functionName = process.env.ZAP_WALLET_PROOF_FUNCTION ?? "zap-wallet-proof";
+  const response = await fetch(`${url.replace(/\/$/, "")}/functions/v1/${functionName}`, {
     body: JSON.stringify(await request.json()),
     headers: {
       apikey: apiKey,
