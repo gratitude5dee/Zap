@@ -140,6 +140,7 @@ async function initCommand(args, flags) {
     "UPSTASH_REDIS_REST_TOKEN=",
     "NEXT_PUBLIC_CONVEX_URL=",
     "NEXT_PUBLIC_SUPABASE_URL=",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY=",
   ].join("\n") + "\n");
   if (!flags.empty) {
@@ -368,7 +369,7 @@ async function doctorCommand(flags) {
   checks.push(check("zap skills", existsSync(path.join(process.cwd(), "agent", "skills")), "agent/skills present"));
   checks.push(check("convex", Boolean(process.env.NEXT_PUBLIC_CONVEX_URL), "NEXT_PUBLIC_CONVEX_URL configured"));
   checks.push(check("upstash", Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN), "Upstash REST env configured"));
-  checks.push(check("supabase", Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY), "Supabase public env configured"));
+  checks.push(check("supabase", Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)), "Supabase public env configured"));
   checks.push(check("hyperframes", hasExecutable("npx") && canRun("npx", ["hyperframes", "--version"]), "optional HyperFrames CLI available"));
   if (flags.json) printJson({ checks });
   else checks.forEach((item) => console.log(`${item.ok ? "ok" : "warn"} ${item.name}: ${item.detail}`));

@@ -11,7 +11,7 @@ export type RevealedZapSecrets = Partial<Record<ZapSecretType, string>>;
 
 export function getSupabasePublicConfig() {
   return {
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    apiKey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     url: process.env.NEXT_PUBLIC_SUPABASE_URL,
   };
 }
@@ -23,15 +23,15 @@ export function getBearerToken(request: Request) {
 }
 
 export async function callSupabaseFunction<T>(functionName: string, options: SupabaseEdgeOptions): Promise<T> {
-  const { anonKey, url } = getSupabasePublicConfig();
-  if (!url || !anonKey) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required.");
+  const { apiKey, url } = getSupabasePublicConfig();
+  if (!url || !apiKey) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL and either NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY are required.");
   }
 
   const response = await fetch(`${url.replace(/\/$/, "")}/functions/v1/${functionName}`, {
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     headers: {
-      apikey: anonKey,
+      apikey: apiKey,
       authorization: `Bearer ${options.userAccessToken}`,
       "content-type": "application/json",
       ...(options.serverReveal && process.env.ZAP_SECRET_REVEAL_TOKEN

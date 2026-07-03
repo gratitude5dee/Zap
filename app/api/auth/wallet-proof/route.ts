@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { getSupabasePublicConfig } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-  const { anonKey, url } = getSupabasePublicConfig();
-  if (!url || !anonKey) {
+  const { apiKey, url } = getSupabasePublicConfig();
+  if (!url || !apiKey) {
     return NextResponse.json({ error: "Supabase public env is not configured." }, { status: 500 });
   }
 
   const response = await fetch(`${url.replace(/\/$/, "")}/functions/v1/wallet-proof`, {
     body: JSON.stringify(await request.json()),
     headers: {
-      apikey: anonKey,
+      apikey: apiKey,
       "content-type": "application/json",
     },
     method: "POST",

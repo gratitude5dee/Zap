@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   if (!token) {
     const config = getSupabasePublicConfig();
     return NextResponse.json({
-      configured: Boolean(config.url && config.anonKey),
+      configured: Boolean(config.url && config.apiKey),
       project: "wzrdstudio",
       secretTypes: zapSecretTypes,
       secrets: [],

@@ -1,7 +1,12 @@
 -- Zap BYOK provider secret storage for the wzrdstudio Supabase project.
 -- Apply after reviewing the existing user_secrets edge function/table mismatch.
 
+create table if not exists public.user_secrets (
+  user_id uuid not null references auth.users(id) on delete cascade
+);
+
 alter table if exists public.user_secrets
+  add column if not exists user_id uuid references auth.users(id) on delete cascade,
   add column if not exists secret_type text,
   add column if not exists ciphertext text,
   add column if not exists last4 text,

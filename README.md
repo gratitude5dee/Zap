@@ -35,6 +35,7 @@ NEXT_PUBLIC_CONVEX_URL=
 CONVEX_URL=
 AI_GATEWAY_API_KEY=
 NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_THIRDWEB_CLIENT_ID=
 ZAP_POLL_DRAIN_URL=
@@ -43,9 +44,10 @@ ZAP_BASIC_USER=
 ZAP_BASIC_PASSWORD=
 ```
 
-V1 is private-gated. Browser access to `/zap`, `/studio`, `/runs`,
-`/api/providers`, and `/eve` requires HTTP Basic auth unless the request is local
-development or Vercel OIDC.
+Public gallery, docs, quickstart, studio, recipe pages, and mock runs are open.
+Live provider spend requires a wallet-authenticated Supabase bearer token.
+Operational provider webhook and Eve endpoints still support HTTP Basic auth for
+private operations.
 
 ## Local Development
 

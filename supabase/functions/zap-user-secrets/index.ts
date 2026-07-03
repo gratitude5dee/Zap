@@ -33,7 +33,7 @@ Deno.serve(async (request: Request) => {
 
 async function getContext(request: Request) {
   const supabaseUrl = requiredEnv("SUPABASE_URL");
-  const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const serviceRoleKey = supabaseSecretKey();
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice("bearer ".length) : "";
   if (!token) throw new Error("Authorization bearer token required.");
@@ -177,6 +177,18 @@ function requiredEnv(name: string) {
   const value = Deno.env.get(name);
   if (!value) throw new Error(`${name} is required.`);
   return value;
+}
+
+function supabaseSecretKey() {
+  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (legacy) return legacy;
+
+  const encoded = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (!encoded) throw new Error("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS is required.");
+  const keys = JSON.parse(encoded);
+  const key = keys.default ?? Object.values(keys)[0];
+  if (!key || typeof key !== "string") throw new Error("SUPABASE_SECRET_KEYS must include a secret key.");
+  return key;
 }
 
 function encodeBase64(bytes: Uint8Array) {

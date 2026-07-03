@@ -18,7 +18,7 @@ Deno.serve(async (request: Request) => {
     const proof = normalizeProof(body);
     verifyWalletProof(proof);
 
-    const admin = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+    const admin = createClient(requiredEnv("SUPABASE_URL"), supabaseSecretKey());
     const user = await getOrCreateWalletUser(admin, proof.address);
     await recordNonce(admin, proof.address, proof.nonce);
 
@@ -187,6 +187,18 @@ function requiredEnv(name: string) {
   const value = Deno.env.get(name);
   if (!value) throw new Error(`${name} is required.`);
   return value;
+}
+
+function supabaseSecretKey() {
+  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (legacy) return legacy;
+
+  const encoded = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (!encoded) throw new Error("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS is required.");
+  const keys = JSON.parse(encoded);
+  const key = keys.default ?? Object.values(keys)[0];
+  if (!key || typeof key !== "string") throw new Error("SUPABASE_SECRET_KEYS must include a secret key.");
+  return key;
 }
 
 function json(payload: unknown, status = 200) {

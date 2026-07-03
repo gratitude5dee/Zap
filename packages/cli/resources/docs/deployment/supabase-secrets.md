@@ -2,6 +2,15 @@
 
 Zap uses Supabase `wzrdstudio` for creator auth and bring-your-own-key provider secrets.
 
+The web app accepts either a current Supabase publishable key or a legacy anon key:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
+# or, for legacy projects:
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+```
+
 ## Required Fix
 
 The current `user_secrets` table and existing `manage-user-secrets` edge function are not aligned. Before live BYOK runs depend on Supabase, migrate to a single encrypted shape:
@@ -33,7 +42,7 @@ SUPABASE_JWT_SECRET=<project jwt secret>
 ZAP_WALLET_TOKEN_TTL_SECONDS=604800
 ```
 
-`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are supplied by the Supabase Edge Function runtime. The wallet proof function signs short-lived `authenticated` bearer tokens after verifying a wallet signature and one-time nonce.
+`SUPABASE_URL` and `SUPABASE_SECRET_KEYS` are supplied by the Supabase Edge Function runtime. Legacy `SUPABASE_SERVICE_ROLE_KEY` is also supported. The wallet proof function signs short-lived `authenticated` bearer tokens after verifying a wallet signature and one-time nonce.
 
 ## Secret Types
 
