@@ -9,6 +9,7 @@
   },
   "files": [
     "bin",
+    "resources",
     "src",
     "README.md"
   ],

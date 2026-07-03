@@ -86,7 +86,7 @@ async function main(argv) {
       await docsCommand(args.slice(1), flags);
       break;
     case "skills":
-      await skillsCommand(flags);
+      await skillsCommand(args.slice(1), flags);
       break;
     case "doctor":
       await doctorCommand(flags);
@@ -112,18 +112,28 @@ async function initCommand(args, flags) {
   const root = path.resolve(process.cwd(), target);
   await fs.mkdir(path.join(root, "agent", "skills"), { recursive: true });
   await fs.mkdir(path.join(root, "docs"), { recursive: true });
+  await fs.mkdir(path.join(root, ".zap"), { recursive: true });
   await writeNewFile(path.join(root, "package.json"), JSON.stringify({
     name: slugify(path.basename(root)),
     private: true,
     scripts: {
+      "zap:docs": "zap docs",
       "zap:doctor": "zap doctor",
       "zap:new": "zap new",
       "zap:run": "zap run",
+      "zap:skills": "zap skills check",
       "zap:validate": "zap validate",
     },
     type: "module",
   }, null, 2) + "\n");
-  await writeNewFile(path.join(root, "AGENTS.md"), "# Zap Agent Project\n\nUse `zap new`, `zap validate`, and `zap run --json` before shipping recipes.\n");
+  await writeNewFile(path.join(root, "AGENTS.md"), [
+    "# Zap Agent Project",
+    "",
+    "Use `zap new`, `zap validate`, `zap lint`, and `zap run --json` before shipping recipes.",
+    "Mock mode is the default. Use `--live` only after provider keys and budget approval are present.",
+    "",
+  ].join("\n"));
+  await writeNewFile(path.join(root, ".gitignore"), ".env*\n!.env.example\n.zap/runs\nnode_modules\n");
   await writeNewFile(path.join(root, ".env.example"), [
     "ZAP_PROVIDER=mock",
     "UPSTASH_REDIS_REST_URL=",
@@ -132,15 +142,25 @@ async function initCommand(args, flags) {
     "NEXT_PUBLIC_SUPABASE_URL=",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY=",
   ].join("\n") + "\n");
+  if (!flags.empty) {
+    await scaffoldRecipe(root, flags.example ? String(flags.example) : "hello-world", { force: false });
+  }
   if (!flags.json) console.log(`Initialized Zap project at ${root}`);
   else printJson({ ok: true, root });
 }
 
 async function newCommand(args, flags) {
+  assertZapProject(process.cwd());
   const rawSlug = args[0];
   if (!rawSlug) throw new Error("Usage: zap new <slug> [--force]");
+  const { skillDir, slug } = await scaffoldRecipe(process.cwd(), rawSlug, flags);
+  if (flags.json) printJson({ ok: true, skillDir, slug });
+  else console.log(`Created zap-${slug} at ${skillDir}`);
+}
+
+async function scaffoldRecipe(projectRoot, rawSlug, flags) {
   const slug = slugify(rawSlug);
-  const skillDir = path.join(process.cwd(), "agent", "skills", `zap-${slug}`);
+  const skillDir = path.join(projectRoot, "agent", "skills", `zap-${slug}`);
   await fs.mkdir(path.join(skillDir, "prompts"), { recursive: true });
   const skillMd = `# zap-${slug}\n\nUse this skill when a creator wants the ${titleize(slug)} Zap.\n`;
   const zapMd = [
@@ -195,8 +215,7 @@ async function newCommand(args, flags) {
   await writeRecipeFile(path.join(skillDir, "Zap.md"), zapMd, flags.force);
   await writeRecipeFile(path.join(skillDir, "prompts", "initial-frame.md"), "Create a cinematic first frame for: {PROMPT}\n", flags.force);
   await writeRecipeFile(path.join(skillDir, "prompts", "initial-gen.md"), "Animate the first frame into a polished 15 second video: {PROMPT}\n", flags.force);
-  if (flags.json) printJson({ ok: true, skillDir, slug });
-  else console.log(`Created zap-${slug} at ${skillDir}`);
+  return { skillDir, slug };
 }
 
 async function validateCommand(args, flags) {
@@ -230,9 +249,11 @@ async function lintCommand(args, flags) {
 
 async function runCommand(args, flags) {
   const file = (await resolveZapFiles(args))[0];
-  if (!file) throw new Error("Usage: zap run <Zap.md> [--live] [--json]");
+  if (!file) throw new Error("Usage: zap run <slug|Zap.md> [--input KEY=VALUE] [--live] [--json]");
   const spec = await parseZapFile(file);
   validateSpec(spec);
+  const inputs = withMockInputDefaults(spec, parseInputFlags(flags.input), Boolean(flags.live));
+  if (flags.live) validateRequiredInputs(spec, inputs);
   const extendCount = Number(flags.extend ?? spec.steps.find((step) => step.kind === "video.extend")?.repeat?.default ?? 0);
   const steps = expandSteps(spec, extendCount);
   const quoteUsd = flags.live ? estimateUsd(steps) : 0;
@@ -280,10 +301,12 @@ async function statusCommand(args, flags) {
 }
 
 async function addCommand(args, flags) {
+  assertZapProject(process.cwd());
   const name = args[0];
   if (!name) throw new Error("Usage: zap add <registry-name>");
-  const registryDir = path.join(findRepoRoot(), "registry", "zaps", name);
-  const targetDir = path.join(process.cwd(), "agent", "skills", name);
+  const normalizedName = name.startsWith("zap-") ? name : `zap-${slugify(name)}`;
+  const registryDir = path.join(findResourceRoot(), "registry", "zaps", normalizedName);
+  const targetDir = path.join(process.cwd(), "agent", "skills", normalizedName);
   if (!existsSync(registryDir)) throw new Error(`Registry entry ${name} was not found.`);
   await copyDir(registryDir, targetDir, Boolean(flags.force));
   if (flags.json) printJson({ ok: true, targetDir });
@@ -292,7 +315,7 @@ async function addCommand(args, flags) {
 
 async function docsCommand(args, flags) {
   const topic = args[0] ?? "index";
-  const docsRoot = path.join(findRepoRoot(), "docs");
+  const docsRoot = path.join(findResourceRoot(), "docs");
   const candidates = [
     path.join(docsRoot, `${topic}.md`),
     path.join(docsRoot, "quickstart", `${topic}.md`),
@@ -311,10 +334,25 @@ async function docsCommand(args, flags) {
   else console.log(content);
 }
 
-async function skillsCommand(flags) {
-  const skillsDir = path.join(findRepoRoot(), "skills");
-  const manifest = await generateSkillManifest(skillsDir);
+async function skillsCommand(args, flags) {
+  const subcommand = args[0] ?? "generate";
+  const resourceRoot = findResourceRoot();
+  const skillsDir = path.join(resourceRoot, "skills");
+  const manifest = await generateSkillManifest(skillsDir, resourceRoot);
   const manifestPath = path.join(skillsDir, "skills-manifest.json");
+  if (subcommand === "check") {
+    const existing = existsSync(manifestPath) ? JSON.parse(await fs.readFile(manifestPath, "utf8")) : null;
+    const differences = compareSkillManifests(existing, manifest);
+    const result = { differences, manifestPath, ok: differences.length === 0 };
+    if (flags.json) printJson(result);
+    else if (result.ok) console.log(`ok ${manifestPath}`);
+    else differences.forEach((difference) => console.log(`mismatch ${difference}`));
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
+  if (subcommand !== "generate" && subcommand !== "update") {
+    throw new Error("Usage: zap skills [generate|update|check] [--json]");
+  }
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
   if (flags.json) printJson(manifest);
   else {
@@ -389,22 +427,30 @@ function parseArgs(argv) {
     const [rawKey, inlineValue] = withoutPrefix.split("=");
     const key = rawKey.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
     if (inlineValue !== undefined) {
-      flags[key] = inlineValue;
+      setFlag(flags, key, inlineValue);
       continue;
     }
     const next = argv[index + 1];
     if (next && !next.startsWith("-")) {
-      flags[key] = next;
+      setFlag(flags, key, next);
       index += 1;
     } else {
-      flags[key] = true;
+      setFlag(flags, key, true);
     }
   }
   return { args, flags };
 }
 
+function setFlag(flags, key, value) {
+  if (flags[key] === undefined) {
+    flags[key] = value;
+    return;
+  }
+  flags[key] = Array.isArray(flags[key]) ? [...flags[key], value] : [flags[key], value];
+}
+
 async function resolveZapFiles(args) {
-  if (args.length > 0) return args.map((entry) => path.resolve(process.cwd(), entry));
+  if (args.length > 0) return args.map((entry) => resolveZapFile(entry));
   const skillsDir = path.join(process.cwd(), "agent", "skills");
   if (!existsSync(skillsDir)) return [];
   const entries = await fs.readdir(skillsDir, { withFileTypes: true });
@@ -412,6 +458,18 @@ async function resolveZapFiles(args) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => path.join(skillsDir, entry.name, "Zap.md"))
     .filter((file) => existsSync(file));
+}
+
+function resolveZapFile(entry) {
+  const direct = path.resolve(process.cwd(), entry);
+  const slug = slugify(entry.replace(/\.md$/i, ""));
+  const candidates = [
+    direct,
+    path.join(process.cwd(), "agent", "skills", entry, "Zap.md"),
+    path.join(process.cwd(), "agent", "skills", `zap-${slug}`, "Zap.md"),
+    path.join(process.cwd(), "agent", "skills", slug, "Zap.md"),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? direct;
 }
 
 async function parseZapFile(file) {
@@ -441,6 +499,37 @@ function validateSpec(spec) {
       throw new Error("HyperFrames stitch requires a DESIGN.md visual identity.");
     }
   }
+}
+
+function validateRequiredInputs(spec, inputs) {
+  for (const [name, input] of Object.entries(spec.inputs ?? {})) {
+    if (input.required && inputs[name] === undefined) {
+      throw new Error(`Missing required input ${name}. Use --input ${name}=value.`);
+    }
+  }
+}
+
+function parseInputFlags(value) {
+  const values = value === undefined ? [] : Array.isArray(value) ? value : [value];
+  const inputs = {};
+  for (const item of values) {
+    const text = String(item);
+    const separator = text.indexOf("=");
+    if (separator === -1) throw new Error(`Invalid --input "${text}". Expected KEY=VALUE.`);
+    inputs[text.slice(0, separator)] = text.slice(separator + 1);
+  }
+  return inputs;
+}
+
+function withMockInputDefaults(spec, inputs, live) {
+  if (live) return inputs;
+  const next = { ...inputs };
+  for (const [name, input] of Object.entries(spec.inputs ?? {})) {
+    if (input.required && next[name] === undefined) {
+      next[name] = input.type === "image" ? `mock://input/${name}` : `mock-${name.toLowerCase()}`;
+    }
+  }
+  return next;
 }
 
 function lintSpec(spec) {
@@ -514,7 +603,7 @@ async function listMarkdownTopics(root) {
   return nested.flat().sort();
 }
 
-async function generateSkillManifest(skillsDir) {
+async function generateSkillManifest(skillsDir, baseDir = path.dirname(skillsDir)) {
   if (!existsSync(skillsDir)) return { generatedAt: new Date().toISOString(), skills: [], version: 1 };
   const entries = await fs.readdir(skillsDir, { withFileTypes: true });
   const skills = [];
@@ -527,9 +616,30 @@ async function generateSkillManifest(skillsDir) {
       hash.update(path.relative(root, file));
       hash.update(await fs.readFile(file));
     }
-    skills.push({ fileCount: files.length, hash: hash.digest("hex"), path: path.relative(process.cwd(), root), skill: entry.name });
+    skills.push({ fileCount: files.length, hash: hash.digest("hex"), path: path.relative(baseDir, root), skill: entry.name });
   }
   return { generatedAt: new Date().toISOString(), skills: skills.sort((left, right) => left.skill.localeCompare(right.skill)), version: 1 };
+}
+
+function compareSkillManifests(existing, current) {
+  if (!existing) return ["missing skills-manifest.json"];
+  const existingEntries = new Map((existing.skills ?? []).map((entry) => [entry.skill, entry]));
+  const currentEntries = new Map(current.skills.map((entry) => [entry.skill, entry]));
+  const differences = [];
+  for (const [skill, entry] of currentEntries) {
+    const prior = existingEntries.get(skill);
+    if (!prior) {
+      differences.push(`${skill} missing from manifest`);
+      continue;
+    }
+    if (prior.hash !== entry.hash || prior.fileCount !== entry.fileCount || prior.path !== entry.path) {
+      differences.push(`${skill} hash/file metadata changed`);
+    }
+  }
+  for (const skill of existingEntries.keys()) {
+    if (!currentEntries.has(skill)) differences.push(`${skill} exists in manifest but not on disk`);
+  }
+  return differences;
 }
 
 async function listFiles(root) {
@@ -580,6 +690,23 @@ function findRepoRoot() {
   return process.cwd();
 }
 
+function findResourceRoot() {
+  const sourceRoot = findRepoRoot();
+  if (existsSync(path.join(sourceRoot, "docs")) && existsSync(path.join(sourceRoot, "registry")) && existsSync(path.join(sourceRoot, "skills"))) {
+    return sourceRoot;
+  }
+  const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const bundledRoot = path.join(packageRoot, "resources");
+  if (existsSync(bundledRoot)) return bundledRoot;
+  return sourceRoot;
+}
+
+function assertZapProject(root) {
+  if (!existsSync(path.join(root, "package.json")) || !existsSync(path.join(root, "agent", "skills"))) {
+    throw new Error("This command must run from a Zap project root. Run `zap init <dir>` first.");
+  }
+}
+
 function hasExecutable(name) {
   const result = spawnSync("which", [name], { encoding: "utf8" });
   return result.status === 0;
@@ -628,7 +755,7 @@ Commands:
   studio              Start the web studio
   add <name>          Add a registry Zap
   docs [topic]        Print bundled docs
-  skills              Generate skills/skills-manifest.json
+  skills              Generate or check skills/skills-manifest.json
   doctor              Check local setup
   info                Print environment info
   upgrade             Print upgrade guidance
@@ -638,6 +765,7 @@ Commands:
 Common flags:
   --json              Machine-readable output
   --live              Allow live provider spend for run
+  --input KEY=VALUE   Provide a recipe input; repeatable
   --force             Overwrite generated recipe files
   --version           Print version
 `);
