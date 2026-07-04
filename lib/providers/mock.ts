@@ -41,9 +41,16 @@ function createMockRequestId(req: GenRequest, idemKey: string) {
   return `mock_${createHash("sha256")
     .update(JSON.stringify({ capability: req.capability, idemKey, prompt: req.prompt, runId: req.runId, stepId: req.stepId }))
     .digest("hex")
-    .slice(0, 18)}`;
+    .slice(0, 18)}.${extensionForCapability(req.capability)}`;
 }
 
 function mockOutputUrl(requestId: string) {
-  return `mock://provider/${encodeURIComponent(requestId)}.mp4`;
+  const hasExtension = /\.(mp4|png|wav)$/.test(requestId);
+  return `mock://provider/${encodeURIComponent(hasExtension ? requestId : `${requestId}.mp4`)}`;
+}
+
+function extensionForCapability(capability: Capability) {
+  if (capability.startsWith("image.")) return "png";
+  if (capability.startsWith("audio.")) return "wav";
+  return "mp4";
 }

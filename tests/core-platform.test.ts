@@ -82,4 +82,28 @@ steps:
     expect(result.actualUsd).toBe(0);
     expect(result.outputUrl).toContain(submitted.requestId);
   });
+
+  it("uses mock output extensions that match the capability", async () => {
+    const image = await mockAdapter.submit({
+      capability: "image.edit",
+      inputs: {},
+      model: "mock-image",
+      prompt: "hello",
+      provider: "mock",
+      runId: "run_test",
+      stepId: "sketch",
+    }, "idem-image");
+    const audio = await mockAdapter.submit({
+      capability: "audio.sfx",
+      inputs: {},
+      model: "mock-audio",
+      prompt: "hello",
+      provider: "mock",
+      runId: "run_test",
+      stepId: "sound",
+    }, "idem-audio");
+
+    await expect(mockAdapter.poll(image.requestId)).resolves.toMatchObject({ outputUrl: expect.stringMatching(/\.png$/) });
+    await expect(mockAdapter.poll(audio.requestId)).resolves.toMatchObject({ outputUrl: expect.stringMatching(/\.wav$/) });
+  });
 });
