@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { ZAP_DOCS_URL } from "@/lib/zap-urls";
 import type { PublicZapSpec } from "@/lib/zap-schema";
 
 type RunResponse = {
@@ -82,7 +83,7 @@ export function ZapRunner({ zap }: { readonly zap: PublicZapSpec }) {
 
           <nav className="mt-5 flex gap-2 text-sm">
             <Link className="inline-flex min-h-10 items-center rounded-md px-3 text-white/55 transition hover:bg-white/10 hover:text-white" href="/gallery">Gallery</Link>
-            <Link className="inline-flex min-h-10 items-center rounded-md px-3 text-white/55 transition hover:bg-white/10 hover:text-white" href="/docs">Docs</Link>
+            <Link className="inline-flex min-h-10 items-center rounded-md px-3 text-white/55 transition hover:bg-white/10 hover:text-white" href={ZAP_DOCS_URL}>Docs</Link>
             <Link className="inline-flex min-h-10 items-center rounded-md px-3 text-white/55 transition hover:bg-white/10 hover:text-white" href="/studio">Studio</Link>
           </nav>
 

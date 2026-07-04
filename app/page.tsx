@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { CodeWindow, Eyebrow, PageShell, SiteNav } from "@/app/_components/zap-chrome";
 import { ZapCard } from "@/app/_components/zap-card";
+import { ZAP_DOCS_URL } from "@/lib/zap-urls";
 import { listZapSpecs } from "@/lib/zap-files";
 
 const cliProof = `npx @wzrdtech/zap@0.1.0 init match-day
@@ -104,7 +105,7 @@ export default async function Page() {
             <p className="mt-4 text-pretty leading-7 text-white/62">
               Zap keeps prompts, provider routing, budget caps, input contracts, and output shape in files first. The studio is the control room, not a black box.
             </p>
-            <Link className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-md border border-white/15 px-4 font-medium text-sm text-white transition hover:bg-white/10" href="/docs">
+            <Link className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-md border border-white/15 px-4 font-medium text-sm text-white transition hover:bg-white/10" href={ZAP_DOCS_URL}>
               Read the schema docs
               <ArrowRight className="size-4" />
             </Link>

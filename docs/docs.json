@@ -1,0 +1,61 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Zap",
+  "description": "Agent-first generative content recipes on Eve, Convex, Upstash, and Vercel.",
+  "colors": {
+    "primary": "#2287ff"
+  },
+  "seo": {
+    "metatags": {
+      "canonical": "https://docs.zap.wzrd.tech"
+    }
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start",
+        "pages": [
+          "index",
+          "quickstart",
+          "quickstart/agents"
+        ]
+      },
+      {
+        "group": "Build Zaps",
+        "pages": [
+          "zap-spec",
+          "steps",
+          "providers",
+          "budget",
+          "agent"
+        ]
+      },
+      {
+        "group": "Runtime",
+        "pages": [
+          "webapp",
+          "convex",
+          "eve"
+        ]
+      },
+      {
+        "group": "Deploy",
+        "pages": [
+          "deploy",
+          "deployment/vercel",
+          "deployment/supabase-secrets"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/cli",
+          "reference/runtime",
+          "reference/schema",
+          "troubleshooting"
+        ]
+      }
+    ]
+  }
+}

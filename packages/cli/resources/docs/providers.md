@@ -7,6 +7,9 @@ Provider priority for v1:
 - `mock`: deterministic zero-cost outputs for docs, tests, and unauthenticated demos.
 - `gmi`: primary live image/video provider path.
 - `fal`: secondary live provider path.
+- Judge scoring uses AI Gateway via `AI_GATEWAY_API_KEY` and optional
+  `ZAP_JUDGE_MODEL`; without a key, Zap records deterministic `heuristic`
+  feedback instead of labeling the score as VLM-backed.
 - `runware`, `prodia`, `openrouter`, `ai_gateway`: BYOK-ready secret types.
 
 Provider keys are never required for mock runs:

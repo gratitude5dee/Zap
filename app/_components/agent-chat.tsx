@@ -18,6 +18,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { ZAP_DOCS_URL } from "@/lib/zap-urls";
 import { AgentMessage, messageHasVisibleContent } from "./agent-message";
 
 type AgentStatus = ReturnType<typeof useEveAgent>["status"];
@@ -219,7 +220,7 @@ function Header({
         </div>
         <Link
           className="hidden min-h-10 items-center rounded-md px-3 text-sm text-white/55 transition hover:bg-white/10 hover:text-white sm:inline-flex"
-          href="/docs"
+          href={ZAP_DOCS_URL}
         >
           Docs
         </Link>
