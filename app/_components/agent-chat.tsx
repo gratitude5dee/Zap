@@ -54,14 +54,14 @@ export function AgentChat() {
   const handleSubmit = (message: PromptInputMessage) => submitText(message.text);
 
   const composer = (
-    <PromptInput className="!rounded-md border border-zap-line bg-white shadow-[0_14px_40px_rgba(7,9,13,0.12)]" onSubmit={handleSubmit}>
+    <PromptInput className="!rounded-md border border-white/10 bg-black/35 text-white shadow-[0_14px_40px_rgba(0,0,0,0.28)]" onSubmit={handleSubmit}>
       <PromptInputTextarea placeholder="Ask Zap Operator to run, revise, or save a recipe..." />
-      <PromptInputSubmit className="!rounded-md bg-zap-ink text-white hover:bg-black" onStop={agent.stop} status={agent.status} />
+      <PromptInputSubmit className="!rounded-md bg-zap-cyan text-zap-ink hover:bg-white" onStop={agent.stop} status={agent.status} />
     </PromptInput>
   );
 
   return (
-    <main className="zap-paper-grid flex h-dvh flex-col overflow-hidden text-zap-ink">
+    <main className="zap-metal-field flex h-dvh flex-col overflow-hidden bg-zap-ink text-white">
       <Header canReset={!isEmpty} onReset={agent.reset} status={agent.status} />
 
       <AnimatePresence>
@@ -72,11 +72,11 @@ export function AgentChat() {
             exit={{ height: 0, opacity: 0 }}
             initial={{ height: 0, opacity: 0 }}
           >
-            <div className="mt-3 flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
+            <div className="mt-3 flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-white">
               <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-destructive" />
               <div>
                 <p className="font-medium">Request failed</p>
-                <p className="mt-0.5 text-zap-muted">{agent.error.message}</p>
+                <p className="mt-0.5 text-white/55">{agent.error.message}</p>
               </div>
             </div>
           </motion.div>
@@ -106,8 +106,8 @@ export function AgentChat() {
             ))}
             {awaitingResponse ? (
               <motion.div animate={{ opacity: 1 }} className="w-full" initial={{ opacity: 0 }}>
-                <div className="flex w-fit items-center justify-center rounded-md bg-white px-4 py-3">
-                  <Spinner className="size-4 text-zap-muted" />
+                <div className="flex w-fit items-center justify-center rounded-md border border-white/10 bg-white/[0.05] px-4 py-3">
+                  <Spinner className="size-4 text-white/50" />
                 </div>
               </motion.div>
             ) : null}
@@ -132,10 +132,10 @@ export function AgentChat() {
               <Image alt="Zap" className="h-full w-full object-cover" height={96} src="/zaplogo.png" width={96} />
             </div>
             <h1 className="font-semibold text-4xl leading-none">Zap Operator</h1>
-            <p className="mb-5 max-w-xl text-sm leading-6 text-zap-muted">
+            <p className="mb-5 max-w-xl text-sm leading-6 text-white/58">
               Build, inspect, and run Eve-native media recipes from one agent loop.
             </p>
-            <span className="mb-1 text-center font-mono text-zap-muted text-xs">
+            <span className="mb-1 text-center font-mono text-white/45 text-xs">
               Try asking
             </span>
             {SUGGESTION_ROWS.map((row, rowIndex) => (
@@ -150,7 +150,7 @@ export function AgentChat() {
               >
                 {row.map((suggestion) => (
                   <button
-                    className="min-h-10 shrink-0 cursor-pointer whitespace-nowrap rounded-md border border-zap-line bg-white px-3 py-1.5 text-zap-muted text-sm transition-colors hover:border-zap-blue/50 hover:text-zap-ink"
+                    className="min-h-10 shrink-0 cursor-pointer whitespace-nowrap rounded-md border border-white/10 bg-white/[0.055] px-3 py-1.5 text-sm text-white/62 transition-colors hover:border-zap-cyan/50 hover:text-white"
                     key={suggestion}
                     onClick={() => void submitText(suggestion)}
                     type="button"
@@ -186,7 +186,7 @@ function Header({
   readonly status: AgentStatus;
 }) {
   return (
-    <header className="sticky top-0 z-10 shrink-0 border-zap-line border-b bg-white/88 backdrop-blur">
+    <header className="sticky top-0 z-10 shrink-0 border-white/10 border-b bg-black/60 backdrop-blur">
       <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
         <button
           aria-label="Start a new chat"
@@ -200,7 +200,7 @@ function Header({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <button
-              className="cursor-pointer font-semibold text-sm leading-tight transition-colors hover:text-zap-blue disabled:pointer-events-none"
+              className="cursor-pointer font-semibold text-sm leading-tight text-white transition-colors hover:text-zap-cyan disabled:pointer-events-none"
               disabled={!canReset}
               onClick={onReset}
               type="button"
@@ -209,23 +209,23 @@ function Header({
             </button>
             <StatusDot status={status} />
           </div>
-          <p className="text-zap-muted text-xs leading-snug">
+          <p className="text-white/45 text-xs leading-snug">
             Author and run Eve-native media recipes with Convex progress, Upstash queues, GMI routing, and fal fallback on{" "}
-            <a className="text-zap-ink underline-offset-2 hover:underline" href="https://vercel.com/eve" rel="noreferrer" target="_blank">
+            <a className="text-white underline-offset-2 hover:underline" href="https://vercel.com/eve" rel="noreferrer" target="_blank">
               Vercel Eve
             </a>
             .
           </p>
         </div>
         <Link
-          className="hidden min-h-10 items-center rounded-md px-3 text-sm text-zap-muted transition hover:bg-zap-fog hover:text-zap-ink sm:inline-flex"
+          className="hidden min-h-10 items-center rounded-md px-3 text-sm text-white/55 transition hover:bg-white/10 hover:text-white sm:inline-flex"
           href="/docs"
         >
           Docs
         </Link>
         <a
           aria-label="View source on GitHub"
-          className="flex size-10 shrink-0 items-center justify-center rounded-md text-zap-muted transition-colors hover:bg-zap-fog hover:text-zap-ink"
+          className="flex size-10 shrink-0 items-center justify-center rounded-md text-white/55 transition-colors hover:bg-white/10 hover:text-white"
           href="https://github.com/gratitude5dee/Zap"
           rel="noreferrer"
           target="_blank"

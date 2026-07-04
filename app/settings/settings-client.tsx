@@ -176,20 +176,20 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
-      <section className="rounded-md border border-zap-line bg-white p-5">
+      <section className="rounded-md border border-white/10 bg-black/25 p-5">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-md bg-zap-ink text-zap-cyan">
             <WalletCards className="size-5" />
           </div>
           <div>
-            <h2 className="font-semibold text-xl">Thirdweb Wallet Auth</h2>
-            <p className="text-sm text-zap-muted">Use a Supabase access token from the wallet proof flow.</p>
+            <h2 className="font-semibold text-xl text-white">Thirdweb Wallet Auth</h2>
+            <p className="text-sm text-white/50">Use a Supabase access token from the wallet proof flow.</p>
           </div>
         </div>
         <label className="block">
-          <span className="mb-2 block font-medium text-sm">Supabase access token</span>
+          <span className="mb-2 block font-medium text-sm text-white/82">Supabase access token</span>
           <Textarea
-            className="min-h-24"
+            className="min-h-24 border-white/15 bg-white/[0.04] text-white placeholder:text-white/35"
             onChange={(event) => setToken(event.target.value.trim())}
             placeholder="Paste the access_token returned by the Thirdweb/Supabase wallet proof flow"
             value={token}
@@ -200,15 +200,15 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
           Connect Vault
         </Button>
 
-        <div className="mt-7 border-zap-line border-t pt-5">
-          <h3 className="font-semibold">Wallet proof proxy</h3>
-          <p className="mt-1 text-sm text-zap-muted">Sign a Zap wallet proof, or paste the JSON payload produced by your Thirdweb wallet signature flow.</p>
+        <div className="mt-7 border-white/10 border-t pt-5">
+          <h3 className="font-semibold text-white">Wallet proof proxy</h3>
+          <p className="mt-1 text-sm text-white/50">Sign a Zap wallet proof, or paste the JSON payload produced by your Thirdweb wallet signature flow.</p>
           <Button className="mt-3 gap-2" disabled={loading} onClick={connectWalletAndSign} variant="outline">
             {loading ? <Loader2 className="size-4 animate-spin" /> : <WalletCards className="size-4" />}
             Connect Wallet and Sign
           </Button>
           <Textarea
-            className="mt-3 min-h-32 font-mono text-xs"
+            className="mt-3 min-h-32 border-white/15 bg-white/[0.04] font-mono text-white text-xs placeholder:text-white/35"
             onChange={(event) => setWalletPayload(event.target.value)}
             placeholder='{"address":"0x...","message":"...","signature":"...","action":"zap-auth"}'
             value={walletPayload}
@@ -219,27 +219,28 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
         </div>
       </section>
 
-      <section className="rounded-md border border-zap-line bg-white p-5">
+      <section className="rounded-md border border-white/10 bg-black/25 p-5">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-md bg-zap-amber text-zap-ink">
             <KeyRound className="size-5" />
           </div>
           <div>
-            <h2 className="font-semibold text-xl">Provider Secrets</h2>
-            <p className="text-sm text-zap-muted">Stored encrypted in Supabase. Browser reads are masked.</p>
+            <h2 className="font-semibold text-xl text-white">Provider Secrets</h2>
+            <p className="text-sm text-white/50">Stored encrypted in Supabase. Browser reads are masked.</p>
           </div>
         </div>
 
         <div className="grid gap-3">
           <Select onValueChange={(value) => setSecretType(value as ZapSecretType)} value={secretType}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectTrigger className="w-full border-white/15 bg-white/[0.04] text-white"><SelectValue /></SelectTrigger>
+            <SelectContent className="border-white/10 bg-[#0c1218] text-white">
               {secretTypes.map((type) => (
                 <SelectItem key={type} value={type}>{type}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Input
+            className="border-white/15 bg-white/[0.04] text-white placeholder:text-white/35"
             onChange={(event) => setSecretValue(event.target.value)}
             placeholder="Paste provider key or account id"
             type="password"
@@ -252,10 +253,10 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
           {secretTypes.map((type) => {
             const secret = stored.get(type);
             return (
-              <div className="flex items-center justify-between gap-3 rounded-md border border-zap-line bg-zap-fog px-3 py-2" key={type}>
+              <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2" key={type}>
                 <div>
-                  <p className="font-medium text-sm">{type}</p>
-                  <p className="text-zap-muted text-xs">{secret ? `stored ${secret.last4 ?? "****"}` : "not stored"}</p>
+                  <p className="font-medium text-sm text-white">{type}</p>
+                  <p className="text-white/45 text-xs">{secret ? `stored ${secret.last4 ?? "****"}` : "not stored"}</p>
                 </div>
                 <Button disabled={!secret || loading} onClick={() => deleteSecret(type)} size="icon" variant="ghost">
                   <Trash2 className="size-4" />
@@ -264,7 +265,7 @@ export function SettingsClient({ secretTypes }: { readonly secretTypes: readonly
             );
           })}
         </div>
-        {message ? <p className="mt-4 rounded-md border border-zap-line bg-zap-fog px-3 py-2 text-sm text-zap-muted">{message}</p> : null}
+        {message ? <p className="mt-4 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/58">{message}</p> : null}
       </section>
     </div>
   );

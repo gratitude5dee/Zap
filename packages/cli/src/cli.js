@@ -117,7 +117,7 @@ async function initCommand(args, flags) {
     name: slugify(path.basename(root)),
     private: true,
     devDependencies: {
-      "@wzrdtech/zap": `^${version}`,
+      "@wzrdtech/zap": version,
     },
     scripts: {
       "zap:docs": "zap docs",

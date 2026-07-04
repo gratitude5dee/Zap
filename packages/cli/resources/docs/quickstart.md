@@ -3,7 +3,7 @@
 Create a lightweight Zap project, scaffold a recipe, validate it, and run a zero-spend mock pipeline.
 
 ```bash
-npx @wzrdtech/zap init demo --non-interactive
+npx @wzrdtech/zap@0.1.0 init demo --non-interactive
 cd demo
 npm install
 npm run zap:validate
@@ -17,5 +17,5 @@ Mock mode fills missing required inputs with deterministic placeholders. Live pr
 For coding-agent setup, see:
 
 ```bash
-npx @wzrdtech/zap docs agents
+npx @wzrdtech/zap@0.1.0 docs agents
 ```
