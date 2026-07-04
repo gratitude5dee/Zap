@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { getBearerToken } from "@/lib/supabase/server";
 import { liveRunAuthError } from "@/lib/zap-run-auth";
-import { runZapRecipe } from "@/lib/zap-runner-server";
+import { createZapRunTicket, executeZapRun } from "@/lib/zap-runner-server";
+import { toZapErrorPayload } from "@/lib/zap-errors";
 
 const requestSchema = z.object({
+  dryRun: z.boolean().default(false),
   extendCount: z.number().int().min(0).max(64).default(0),
   inputs: z.record(z.string(), z.unknown()).default({}),
   live: z.boolean().default(false),
@@ -24,11 +26,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await runZapRecipe({ ...input, userAccessToken });
-    return NextResponse.json(result);
+    const result = await createZapRunTicket({ ...input, userAccessToken });
+    if (result.execution) {
+      after(() => executeZapRun(result.execution!));
+    }
+    return NextResponse.json(result.response);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Zap run failed" },
+      { error: toZapErrorPayload(error) },
       { status: 400 },
     );
   }

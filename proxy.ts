@@ -8,6 +8,10 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (isProviderWebhook(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   if (isLocal(request) || hasBasicAuth(request)) {
     return NextResponse.next();
   }
@@ -24,6 +28,10 @@ export function proxy(request: NextRequest) {
 function isLocal(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   return host.startsWith("localhost") || host.startsWith("127.0.0.1");
+}
+
+function isProviderWebhook(pathname: string) {
+  return pathname === "/api/providers/fal/webhook" || pathname === "/api/providers/gmi/webhook";
 }
 
 function hasBasicAuth(request: NextRequest) {

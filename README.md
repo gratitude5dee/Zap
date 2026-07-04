@@ -47,7 +47,8 @@ ZAP_BASIC_PASSWORD=
 
 Public gallery, docs, quickstart, studio, recipe pages, and mock runs are open.
 Live provider spend requires a wallet-authenticated Supabase bearer token.
-Operational provider webhook and Eve endpoints still support HTTP Basic auth for
+Provider webhook callbacks are public so hosted providers can report completion;
+poll drain and Eve operational endpoints still support HTTP Basic auth for
 private operations.
 
 ## Local Development

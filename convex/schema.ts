@@ -31,9 +31,11 @@ export default defineSchema({
     .index("by_status", ["status"]),
 
   feedback: defineTable({
+    assetId: v.optional(v.string()),
     comment: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
     kind: v.union(v.literal("rlhf_vote"), v.literal("judge_score")),
-    rater: v.union(v.literal("human"), v.literal("vlm")),
+    rater: v.union(v.literal("heuristic"), v.literal("human"), v.literal("vlm")),
     runId: v.string(),
     scores: v.any(),
     stepId: v.optional(v.string()),
@@ -56,6 +58,7 @@ export default defineSchema({
       v.literal("waiting"),
       v.literal("done"),
       v.literal("failed"),
+      v.literal("canceled"),
     ),
     userId: v.optional(v.string()),
     zapSlug: v.string(),
@@ -63,6 +66,7 @@ export default defineSchema({
     zapVersion: v.number(),
   })
     .index("by_runId", ["runId"])
+    .index("by_startedAt", ["startedAt"])
     .index("by_status", ["status"])
     .index("by_zap", ["zapSlug"]),
 
@@ -80,9 +84,11 @@ export default defineSchema({
     status: v.union(
       v.literal("queued"),
       v.literal("running"),
+      v.literal("waiting"),
       v.literal("done"),
       v.literal("failed"),
       v.literal("skipped"),
+      v.literal("canceled"),
     ),
     stepId: v.string(),
   })
@@ -92,6 +98,7 @@ export default defineSchema({
 
   zaps: defineTable({
     authorId: v.optional(v.string()),
+    compiledFromRunId: v.optional(v.string()),
     estimateUsd: v.number(),
     slug: v.string(),
     source: v.string(),

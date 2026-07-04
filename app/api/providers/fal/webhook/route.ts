@@ -3,6 +3,6 @@ import { recordProviderWebhook } from "@/lib/provider-webhooks";
 
 export async function POST(request: Request) {
   const payload = await request.json();
-  await recordProviderWebhook("fal", payload);
-  return NextResponse.json({ ok: true });
+  const result = await recordProviderWebhook("fal", payload, { url: request.url });
+  return NextResponse.json({ ok: true, result });
 }

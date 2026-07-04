@@ -1,5 +1,6 @@
 import { parseDocument } from "yaml";
 import { z } from "zod";
+import { ZapRunError } from "./zap-errors";
 
 export const zapInputSchema = z.object({
   hint: z.string().optional(),
@@ -80,9 +81,25 @@ export function parseZapMarkdown(markdown: string): ZapSpec {
   const frontmatter = extractFrontmatter(markdown);
   const parsed = parseDocument(frontmatter).toJS();
   const spec = zapSpecSchema.parse(parsed);
-  validateVariables(spec);
-  validateDuplicateStepIds(spec);
+  validateSpec(spec);
   return spec;
+}
+
+export function validateZapPromptTemplates(spec: ZapSpec, promptContents: Record<string, string>) {
+  for (const step of spec.steps) {
+    const promptRef = step.prompt;
+    if (!promptRef || !isPromptFile(promptRef)) continue;
+    const content = promptContents[promptRef];
+    if (content === undefined) {
+      throw new ZapRunError({
+        code: "SCHEMA_INVALID",
+        message: `Step ${step.id} references missing prompt file ${promptRef}.`,
+        remediation: "Create the prompt file or update the step.prompt path before running the Zap.",
+        retryable: false,
+      });
+    }
+    validateTemplateVariables(spec, step.id, content);
+  }
 }
 
 export function publicZapSpec(spec: ZapSpec): PublicZapSpec {
@@ -97,15 +114,18 @@ function extractFrontmatter(markdown: string) {
   return match[1];
 }
 
-function validateVariables(spec: ZapSpec) {
+function validateSpec(spec: ZapSpec) {
+  validateDuplicateStepIds(spec);
+  validateStepRefs(spec);
+  validateVideoDurations(spec);
+  validateInlineVariables(spec);
+}
+
+function validateInlineVariables(spec: ZapSpec) {
   const declared = new Set(Object.keys(spec.inputs));
   for (const step of spec.steps) {
     const promptRef = step.prompt ?? "";
-    for (const variable of promptRef.matchAll(/\{([A-Z0-9_]+)\}/g)) {
-      if (!declared.has(variable[1])) {
-        throw new Error(`Step ${step.id} references undeclared input {${variable[1]}}.`);
-      }
-    }
+    if (!isPromptFile(promptRef)) validateTemplateVariables(spec, step.id, promptRef, declared);
   }
 }
 
@@ -115,6 +135,95 @@ function validateDuplicateStepIds(spec: ZapSpec) {
     if (seen.has(step.id)) throw new Error(`Duplicate step id ${step.id}.`);
     seen.add(step.id);
   }
+}
+
+function validateStepRefs(spec: ZapSpec) {
+  const declaredInputs = new Set(Object.keys(spec.inputs));
+  const priorSteps = new Set<string>();
+  for (const step of spec.steps) {
+    for (const ref of [...(step.inputs ?? []), ...(step.reference_images ?? [])]) {
+      validateRef({ declaredInputs, priorSteps, ref, stepId: step.id });
+    }
+    priorSteps.add(step.id);
+  }
+}
+
+function validateRef({
+  declaredInputs,
+  priorSteps,
+  ref,
+  stepId,
+}: {
+  declaredInputs: Set<string>;
+  priorSteps: Set<string>;
+  ref: string;
+  stepId: string;
+}) {
+  if (ref.startsWith("user.")) {
+    const inputName = ref.slice("user.".length);
+    if (declaredInputs.has(inputName)) return;
+    throw new ZapRunError({
+      code: "SCHEMA_INVALID",
+      message: `Step ${stepId} references undeclared input ${ref}.`,
+      remediation: `Declare input ${inputName} or remove ${ref} from the step refs.`,
+      retryable: false,
+    });
+  }
+
+  if (ref.endsWith(".*")) {
+    const prefix = ref.slice(0, -2);
+    if (priorSteps.has(prefix)) return;
+    throw new ZapRunError({
+      code: "SCHEMA_INVALID",
+      message: `Step ${stepId} references unknown repeated step ${ref}.`,
+      remediation: `Move the referenced step before ${stepId}, fix the step id, or remove ${ref}.`,
+      retryable: false,
+    });
+  }
+
+  if (priorSteps.has(ref) || declaredInputs.has(ref)) return;
+
+  throw new ZapRunError({
+    code: "SCHEMA_INVALID",
+    message: `Step ${stepId} references unknown input or step ${ref}.`,
+    remediation: `Use user.<input>, a prior step id, or a declared bare input name for ${ref}.`,
+    retryable: false,
+  });
+}
+
+function validateVideoDurations(spec: ZapSpec) {
+  for (const step of spec.steps) {
+    if (step.kind.startsWith("video.") && step.duration_s === undefined) {
+      throw new ZapRunError({
+        code: "SCHEMA_INVALID",
+        message: `Video step ${step.id} is missing duration_s.`,
+        remediation: "Add duration_s so the runner can quote cost and enforce budget before submission.",
+        retryable: false,
+      });
+    }
+  }
+}
+
+function validateTemplateVariables(
+  spec: ZapSpec,
+  stepId: string,
+  template: string,
+  declared = new Set(Object.keys(spec.inputs)),
+) {
+  for (const variable of template.matchAll(/\{([A-Z0-9_]+)\}/g)) {
+    if (!declared.has(variable[1])) {
+      throw new ZapRunError({
+        code: "SCHEMA_INVALID",
+        message: `Step ${stepId} references undeclared input {${variable[1]}}.`,
+        remediation: `Declare input ${variable[1]} in the Zap frontmatter or remove the template variable.`,
+        retryable: false,
+      });
+    }
+  }
+}
+
+function isPromptFile(prompt: string) {
+  return prompt.endsWith(".md") || prompt.startsWith("prompts/");
 }
 
 function titleize(slug: string) {

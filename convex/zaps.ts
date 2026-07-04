@@ -23,6 +23,7 @@ export const getBySlug = query({
 export const upsert = mutation({
   args: {
     authorId: v.optional(v.string()),
+    compiledFromRunId: v.optional(v.string()),
     estimateUsd: v.number(),
     slug: v.string(),
     source: v.string(),

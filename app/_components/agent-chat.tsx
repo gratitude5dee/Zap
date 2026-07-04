@@ -31,7 +31,7 @@ const SUGGESTION_ROWS = [
 
 const SPRING = { type: "spring", stiffness: 320, damping: 32 } as const;
 
-export function AgentChat() {
+export function AgentChat({ className }: { readonly className?: string } = {}) {
   const agent = useEveAgent();
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
   const isEmpty = agent.data.messages.length === 0;
@@ -61,7 +61,7 @@ export function AgentChat() {
   );
 
   return (
-    <main className="zap-metal-field flex h-dvh flex-col overflow-hidden bg-zap-ink text-white">
+    <section className={cn("zap-metal-field flex h-dvh flex-col overflow-hidden bg-zap-ink text-white", className)}>
       <Header canReset={!isEmpty} onReset={agent.reset} status={agent.status} />
 
       <AnimatePresence>
@@ -172,7 +172,7 @@ export function AgentChat() {
           <motion.div layout transition={SPRING}>{composer}</motion.div>
         </motion.div>
       </div>
-    </main>
+    </section>
   );
 }
 

@@ -1,6 +1,5 @@
-import { ConvexHttpClient } from "convex/browser";
 import { NextResponse } from "next/server";
-import { api } from "@/convex/_generated/api";
+import { recordProviderProgress } from "@/lib/provider-webhooks";
 import { deadLetterProviderPoll, dequeueProviderPoll, requeueProviderPoll } from "@/lib/redis";
 import { pollGeneration } from "@/lib/providers/router";
 
@@ -14,7 +13,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const convex = process.env.NEXT_PUBLIC_CONVEX_URL ? new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL) : null;
   const results: Array<{ provider: string; requestId: string; status: string }> = [];
 
   for (const provider of providers) {
@@ -26,36 +24,12 @@ export async function POST(request: Request) {
         const result = await pollGeneration(provider, job.requestId);
         const runId = job.payload?.runId;
         const stepId = job.payload?.stepId;
-        if (convex && runId && stepId) {
-          await convex.mutation(api.runs.upsertStep, {
-            actualUsd: result.actualUsd,
-            error: result.error,
-            kind: job.payload?.capability ?? "unknown",
-            priceQuoteUsd: 0,
-            progress: result.progress ?? (result.status === "done" ? 1 : 0),
-            provider,
-            providerRequestId: job.requestId,
-            runId,
-            status: result.status === "failed" ? "failed" : result.status === "done" ? "done" : "running",
-            stepId,
-          });
-          if (result.outputUrl) {
-            await convex.mutation(api.runs.addAsset, {
-              kind: result.outputUrl.endsWith(".wav") ? "wav" : result.outputUrl.endsWith(".png") ? "png" : "mp4",
-              parents: [],
-              runId,
-              stepId,
-              url: result.outputUrl,
-            });
-          }
-          if (result.status === "failed") {
-            await convex.mutation(api.runs.updateRun, {
-              error: result.error,
-              runId,
-              status: "failed",
-            });
-          }
-        }
+        await recordProviderProgress(provider, result, {
+          capability: job.payload?.capability,
+          requestId: job.requestId,
+          runId,
+          stepId,
+        });
 
         if (result.status === "queued" || result.status === "running") {
           if ((job.attempts ?? 0) >= maxAttempts) {

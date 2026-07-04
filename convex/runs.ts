@@ -31,6 +31,7 @@ export const get = query({
   args: { runId: v.string() },
   returns: v.object({
     assets: v.array(v.any()),
+    feedback: v.array(v.any()),
     run: v.union(v.any(), v.null()),
     steps: v.array(v.any()),
   }),
@@ -47,7 +48,49 @@ export const get = query({
       .query("assets")
       .withIndex("by_run", (q: any) => q.eq("runId", args.runId))
       .collect();
-    return { assets, run, steps };
+    const feedback = await ctx.db
+      .query("feedback")
+      .withIndex("by_run", (q: any) => q.eq("runId", args.runId))
+      .collect();
+    return { assets, feedback, run, steps };
+  },
+});
+
+export const listRecent = query({
+  args: { limit: v.optional(v.number()) },
+  returns: v.array(v.any()),
+  handler: async (ctx, args) => {
+    const runs = await ctx.db
+      .query("runs")
+      .withIndex("by_startedAt")
+      .order("desc")
+      .take(Math.min(args.limit ?? 8, 20));
+
+    return await Promise.all(
+      runs.map(async (run: any) => {
+        const steps = await ctx.db
+          .query("steps")
+          .withIndex("by_run", (q: any) => q.eq("runId", run.runId))
+          .collect();
+        const assets = await ctx.db
+          .query("assets")
+          .withIndex("by_run", (q: any) => q.eq("runId", run.runId))
+          .collect();
+        const feedback = await ctx.db
+          .query("feedback")
+          .withIndex("by_run", (q: any) => q.eq("runId", run.runId))
+          .collect();
+        return { assets, feedback, run, steps };
+      }),
+    );
+  },
+});
+
+export const getAsset = query({
+  args: { assetId: v.id("assets") },
+  returns: v.union(v.any(), v.null()),
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.assetId);
   },
 });
 
@@ -57,7 +100,7 @@ export const updateRun = mutation({
     error: v.optional(v.string()),
     runId: v.string(),
     stage: v.optional(v.string()),
-    status: v.union(v.literal("queued"), v.literal("running"), v.literal("waiting"), v.literal("done"), v.literal("failed")),
+    status: v.union(v.literal("queued"), v.literal("running"), v.literal("waiting"), v.literal("done"), v.literal("failed"), v.literal("canceled")),
     zapUrl: v.optional(v.string()),
   },
   returns: v.null(),
@@ -70,7 +113,7 @@ export const updateRun = mutation({
     await ctx.db.patch(run._id, {
       costUsd: args.costUsd ?? run.costUsd,
       error: args.error,
-      finishedAt: args.status === "done" || args.status === "failed" ? Date.now() : run.finishedAt,
+      finishedAt: args.status === "done" || args.status === "failed" || args.status === "canceled" ? Date.now() : run.finishedAt,
       stage: args.stage,
       status: args.status,
       zapUrl: args.zapUrl,
@@ -91,7 +134,7 @@ export const upsertStep = mutation({
     provider: v.optional(v.string()),
     providerRequestId: v.optional(v.string()),
     runId: v.string(),
-    status: v.union(v.literal("queued"), v.literal("running"), v.literal("done"), v.literal("failed"), v.literal("skipped")),
+    status: v.union(v.literal("queued"), v.literal("running"), v.literal("waiting"), v.literal("done"), v.literal("failed"), v.literal("skipped"), v.literal("canceled")),
     stepId: v.string(),
   },
   returns: v.null(),
@@ -123,6 +166,12 @@ export const addAsset = mutation({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("assets")
+      .withIndex("by_step", (q: any) => q.eq("runId", args.runId).eq("stepId", args.stepId))
+      .filter((q: any) => q.eq(q.field("url"), args.url))
+      .first();
+    if (existing) return existing._id;
     return await ctx.db.insert("assets", args);
   },
 });

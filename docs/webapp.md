@@ -17,7 +17,7 @@ Auth posture:
 
 - Public docs, gallery, and mock demo runs are accessible.
 - Creator live runs and provider secrets require wallet-authenticated Supabase bearer tokens.
-- Basic Auth may still protect legacy provider/Eve surfaces where configured.
+- Provider webhooks are public callbacks; poll drain and Eve operational surfaces may still require Basic Auth.
 
 Smoke production after deploy:
 
