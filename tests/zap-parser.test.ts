@@ -23,6 +23,7 @@ steps:
     model: seedance-2-0-260128
     duration_s: 15
     repeat: { min: 0, max: 64, default: 0 }
+    retry: { max: 2, backoff_s: 1, fallback_provider: fal, fallback_model: fal-ai/kling-video/v2.1/pro/image-to-video }
     extend: { mode: anchored }
     keyframes: { count: 4 }
   - id: finalize
@@ -34,6 +35,8 @@ output: Zap.mp4
 
     expect(spec.zap).toBe("test-zap");
     expect(spec.steps[1]?.extend?.mode).toBe("anchored");
+    expect(spec.steps[1]?.retry?.max).toBe(2);
+    expect(spec.steps[1]?.retry?.fallback_provider).toBe("fal");
     expect(spec.steps[0]?.candidates).toBe(2);
   });
 

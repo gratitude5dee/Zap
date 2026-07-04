@@ -39,6 +39,10 @@ steps:
     model: mock-video
     inputs: [initial_frame]
     duration_s: 15
+    retry:
+      max: 2
+      backoff_s: 3
+      fallback_provider: fal
     prompt: prompts/initial-gen.md
   - id: stitch
     kind: stitch
@@ -54,6 +58,8 @@ Rules agents must preserve:
 - `budget.estimate_usd` must not exceed `budget.cap_usd`.
 - Mock provider is valid for tests and demos.
 - Live provider runs require explicit `--live` or authenticated web confirmation.
+- Provider-backed steps may define `retry.max`, `retry.backoff_s`,
+  `retry.fallback_provider`, and `retry.fallback_model` for bounded repair.
 
 Validate after every recipe edit:
 

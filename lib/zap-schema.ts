@@ -44,6 +44,12 @@ export const zapStepSchema = z.object({
     max: z.number().int().min(0).max(64).optional(),
     min: z.number().int().min(0).optional(),
   }).optional(),
+  retry: z.object({
+    backoff_s: z.number().min(0).max(300).default(0),
+    fallback_model: z.string().optional(),
+    fallback_provider: z.string().optional(),
+    max: z.number().int().min(0).max(8).default(0),
+  }).optional(),
   rlhf: z.union([z.literal("optional"), z.boolean()]).optional(),
   shared: z.boolean().optional(),
   stitch: z.object({

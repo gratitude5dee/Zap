@@ -245,7 +245,9 @@ export async function executeZapRun({ inputs, live = false, planned, provider, q
       }
 
       const judgeConfig = judgeConfigForStep(step);
-      const maxAttempts = judgeConfig ? step.candidates ?? 1 : 1;
+      const retryPolicy = step.retry;
+      const judgeAttempts = judgeConfig ? step.candidates ?? 1 : 1;
+      const maxAttempts = Math.max(judgeAttempts, (retryPolicy?.max ?? 0) + 1);
       const conditioning = await prepareProviderConditioning({
         lastVideoOutputUrl,
         lastVideoStepId,
@@ -255,143 +257,167 @@ export async function executeZapRun({ inputs, live = false, planned, provider, q
       let accepted = false;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        const request = await buildGenerationRequest(zap, runId, step, normalizedInputs, assetUrls, conditioning.imageUrls, {
-          provider: live ? provider : "mock",
-          userAccessToken: live ? userAccessToken : undefined,
-        });
-        request.attemptSalt = attemptSalt(step.id, attempt, humanRetryCounts);
-        const submitted = await submitGeneration(request);
-        await upsertStepLedger({
-          idemKey: submitted.idemKey,
-          kind: step.kind,
-          model: step.model,
-          priceQuoteUsd: stepQuoteUsd,
-          progress: 0.1,
-          provider: submitted.provider,
-          providerRequestId: submitted.requestId,
-          runId,
-          status: "running",
-          stepId: step.id,
-        });
-
-        const result = await pollGenerationUntilDone(submitted.provider, submitted.requestId, request.secrets, async (progress) => {
+        const attemptStep = stepForAttempt(step, attempt);
+        const attemptQuoteUsd = attempt === 1 ? stepQuoteUsd : quoteForStep(zap, runId, attemptStep, normalizedInputs);
+        try {
+          const request = await buildGenerationRequest(zap, runId, attemptStep, normalizedInputs, assetUrls, conditioning.imageUrls, {
+            provider: live ? provider : "mock",
+            userAccessToken: live ? userAccessToken : undefined,
+          });
+          request.attemptSalt = attemptSalt(step.id, attempt, humanRetryCounts);
+          const submitted = await submitGeneration(request);
           await upsertStepLedger({
             idemKey: submitted.idemKey,
-            kind: step.kind,
-            model: step.model,
-            priceQuoteUsd: stepQuoteUsd,
-            progress,
+            kind: attemptStep.kind,
+            model: attemptStep.model,
+            priceQuoteUsd: attemptQuoteUsd,
+            progress: 0.1,
             provider: submitted.provider,
             providerRequestId: submitted.requestId,
             runId,
             status: "running",
             stepId: step.id,
           });
-        });
-        await assertRunNotCanceled(runId);
-        if (!result.outputUrl) {
-          throw new ZapRunError({
-            code: "PROVIDER_UNSUPPORTED",
-            message: `Provider ${submitted.provider} completed ${step.id} without an output URL.`,
-            remediation: "Check the provider adapter output parser for this model and add the correct URL extraction path.",
-            retryable: true,
-          });
-        }
 
-        const stored = await persistStepOutput(runId, step, result.outputUrl);
-        const assetUrl = stored?.url ?? result.outputUrl;
-        const actualUsd = result.actualUsd ?? stepQuoteUsd;
-        costUsd += actualUsd;
-
-        const assetId = await addAssetLedger({
-          kind: inferAssetKind(step, assetUrl),
-          parents: [...(step.inputs ?? []), ...(step.reference_images ?? [])],
-          runId,
-          stepId: step.id,
-          storageKey: stored?.storageKey,
-          url: assetUrl,
-        });
-
-        const judgeResult = judgeConfig
-          ? await judgeAsset({
-            assetId,
-            assetUrl,
-            criteria: judgeConfig.criteria,
-            runId,
-            stepId: step.id,
-            threshold: judgeConfig.threshold,
-          })
-          : null;
-
-        if (judgeResult && !judgeResult.passed) {
-          const payload = judgeFailurePayload(judgeResult);
-          const canRetry = attempt < maxAttempts && costUsd + stepQuoteUsd <= zap.budget.cap_usd;
-          if (canRetry) {
+          const result = await pollGenerationUntilDone(submitted.provider, submitted.requestId, request.secrets, async (progress) => {
             await upsertStepLedger({
-              actualUsd,
-              error: JSON.stringify(payload),
               idemKey: submitted.idemKey,
-              kind: step.kind,
-              model: step.model,
-              priceQuoteUsd: stepQuoteUsd,
-              progress: attempt / maxAttempts,
+              kind: attemptStep.kind,
+              model: attemptStep.model,
+              priceQuoteUsd: attemptQuoteUsd,
+              progress,
               provider: submitted.provider,
               providerRequestId: submitted.requestId,
               runId,
               status: "running",
               stepId: step.id,
             });
-            await updateRunLedger({ costUsd, runId, stage: `${step.id}:judge_retry_${attempt + 1}`, status: "running", zapUrl });
-            continue;
+          });
+          await assertRunNotCanceled(runId);
+          if (!result.outputUrl) {
+            throw new ZapRunError({
+              code: "PROVIDER_UNSUPPORTED",
+              message: `Provider ${submitted.provider} completed ${step.id} without an output URL.`,
+              remediation: "Check the provider adapter output parser for this model and add the correct URL extraction path.",
+              retryable: true,
+            });
           }
 
+          const stored = await persistStepOutput(runId, step, result.outputUrl);
+          const assetUrl = stored?.url ?? result.outputUrl;
+          const actualUsd = result.actualUsd ?? attemptQuoteUsd;
+          costUsd += actualUsd;
+
+          const assetId = await addAssetLedger({
+            kind: inferAssetKind(step, assetUrl),
+            parents: [...(step.inputs ?? []), ...(step.reference_images ?? [])],
+            runId,
+            stepId: step.id,
+            storageKey: stored?.storageKey,
+            url: assetUrl,
+          });
+
+          const judgeResult = judgeConfig
+            ? await judgeAsset({
+              assetId,
+              assetUrl,
+              criteria: judgeConfig.criteria,
+              runId,
+              stepId: step.id,
+              threshold: judgeConfig.threshold,
+            })
+            : null;
+
+          if (judgeResult && !judgeResult.passed) {
+            const payload = judgeFailurePayload(judgeResult);
+            const canRetry = attempt < maxAttempts && costUsd + attemptQuoteUsd <= zap.budget.cap_usd;
+            if (canRetry) {
+              await upsertStepLedger({
+                actualUsd,
+                error: JSON.stringify(payload),
+                idemKey: submitted.idemKey,
+                kind: attemptStep.kind,
+                model: attemptStep.model,
+                priceQuoteUsd: attemptQuoteUsd,
+                progress: attempt / maxAttempts,
+                provider: submitted.provider,
+                providerRequestId: submitted.requestId,
+                runId,
+                status: "running",
+                stepId: step.id,
+              });
+              await updateRunLedger({ costUsd, runId, stage: `${step.id}:judge_retry_${attempt + 1}`, status: "running", zapUrl });
+              await sleepRetryBackoff(retryPolicy);
+              continue;
+            }
+
+            await upsertStepLedger({
+              actualUsd,
+              error: JSON.stringify(payload),
+              idemKey: submitted.idemKey,
+              kind: attemptStep.kind,
+              model: attemptStep.model,
+              priceQuoteUsd: attemptQuoteUsd,
+              progress: 1,
+              provider: submitted.provider,
+              providerRequestId: submitted.requestId,
+              runId,
+              status: "waiting",
+              stepId: step.id,
+            });
+            await updateRunLedger({
+              costUsd,
+              error: JSON.stringify(payload),
+              runId,
+              stage: `${step.id}:judge_review`,
+              status: "waiting",
+              zapUrl,
+            });
+            return;
+          }
+
+          assetUrls.set(step.id, assetUrl);
+          if (isVideoStep(step)) {
+            zapUrl = assetUrl;
+            lastVideoOutputUrl = assetUrl;
+            lastVideoStepId = step.id;
+          }
           await upsertStepLedger({
             actualUsd,
-            error: JSON.stringify(payload),
             idemKey: submitted.idemKey,
-            kind: step.kind,
-            model: step.model,
-            priceQuoteUsd: stepQuoteUsd,
+            kind: attemptStep.kind,
+            model: attemptStep.model,
+            priceQuoteUsd: attemptQuoteUsd,
             progress: 1,
             provider: submitted.provider,
             providerRequestId: submitted.requestId,
             runId,
-            status: "waiting",
+            status: "done",
             stepId: step.id,
           });
-          await updateRunLedger({
-            costUsd,
+          await updateRunLedger({ costUsd, runId, stage: step.id, status: "running", zapUrl });
+          accepted = true;
+          break;
+        } catch (error) {
+          const payload = toZapErrorPayload(error);
+          const retryable = payload.retryable || Boolean(retryPolicy);
+          const canRetry = retryable && attempt < maxAttempts && costUsd + attemptQuoteUsd <= zap.budget.cap_usd;
+          if (!canRetry) throw error;
+          await upsertStepLedger({
             error: JSON.stringify(payload),
+            kind: attemptStep.kind,
+            model: attemptStep.model,
+            priceQuoteUsd: attemptQuoteUsd,
+            progress: attempt / maxAttempts,
+            provider: attemptStep.provider ?? step.provider ?? zap.defaults.provider,
             runId,
-            stage: `${step.id}:judge_review`,
-            status: "waiting",
-            zapUrl,
+            status: "running",
+            stepId: step.id,
           });
-          return;
+          await updateRunLedger({ costUsd, runId, stage: `${step.id}:retry_${attempt + 1}`, status: "running", zapUrl });
+          await sleepRetryBackoff(retryPolicy);
+          continue;
         }
-
-        assetUrls.set(step.id, assetUrl);
-        if (isVideoStep(step)) {
-          zapUrl = assetUrl;
-          lastVideoOutputUrl = assetUrl;
-          lastVideoStepId = step.id;
-        }
-        await upsertStepLedger({
-          actualUsd,
-          idemKey: submitted.idemKey,
-          kind: step.kind,
-          model: step.model,
-          priceQuoteUsd: stepQuoteUsd,
-          progress: 1,
-          provider: submitted.provider,
-          providerRequestId: submitted.requestId,
-          runId,
-          status: "done",
-          stepId: step.id,
-        });
-        await updateRunLedger({ costUsd, runId, stage: step.id, status: "running", zapUrl });
-        accepted = true;
-        break;
       }
 
       if (!accepted) return;
@@ -793,6 +819,20 @@ function attemptSalt(stepId: string, attempt: number, counts: Map<string, number
   if (attempt > 1 && count > 0) return `human-retry-${count}:judge-retry-${attempt}`;
   if (attempt > 1) return `judge-retry-${attempt}`;
   return count > 0 ? `human-retry-${count}` : undefined;
+}
+
+function stepForAttempt(step: ZapStep, attempt: number): ZapStep {
+  if (attempt <= 1 || !step.retry) return step;
+  return {
+    ...step,
+    model: step.retry.fallback_model ?? step.model,
+    provider: step.retry.fallback_provider ?? step.provider,
+  };
+}
+
+async function sleepRetryBackoff(retry?: ZapStep["retry"]) {
+  const backoffMs = Math.max(0, retry?.backoff_s ?? 0) * 1000;
+  if (backoffMs > 0) await sleep(backoffMs);
 }
 
 function isVideoStep(step: ZapStep) {
