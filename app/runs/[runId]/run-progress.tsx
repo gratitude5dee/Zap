@@ -40,6 +40,8 @@ type RunView = {
 
 export function RunProgress({ runId, fallbackStatus }: { readonly fallbackStatus?: string; readonly runId: string }) {
   const data = useQuery(getRun, { runId }) as RunView | undefined;
+  const [rerunBusyStep, setRerunBusyStep] = useState<string | null>(null);
+  const [rerunMessage, setRerunMessage] = useState<string | null>(null);
   if (data === undefined) {
     return <p className="mt-4 text-sm text-white/50">Loading run state from Convex...</p>;
   }
@@ -47,6 +49,29 @@ export function RunProgress({ runId, fallbackStatus }: { readonly fallbackStatus
     return <p className="mt-4 text-sm text-white/50">Run queued locally: {fallbackStatus ?? "unknown"}</p>;
   }
   const waitingStep = data.steps.find((step) => step.status === "waiting");
+  const canRerun = data.run.status !== "running" && data.run.status !== "queued";
+  const rerunnableStepIds = new Set(data.steps.map((step) => step.stepId));
+
+  async function submitRerunFrom(stepId: string) {
+    setRerunBusyStep(stepId);
+    setRerunMessage(null);
+    const response = await fetch(`/api/runs/${runId}/rerun-from`, {
+      body: JSON.stringify({
+        comment: `Human requested re-run from ${stepId}.`,
+        stepId,
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setRerunMessage(formatRunError(JSON.stringify(payload.error ?? payload)));
+      setRerunBusyStep(null);
+      return;
+    }
+    setRerunMessage(`Re-running from ${stepId}...`);
+    setRerunBusyStep(null);
+  }
 
   return (
     <div className="mt-4 space-y-4">
@@ -85,7 +110,10 @@ export function RunProgress({ runId, fallbackStatus }: { readonly fallbackStatus
       </div>
       {data.assets.length > 0 ? (
         <section className="rounded-md border border-white/10 bg-white/[0.04] p-3">
-          <h2 className="font-medium text-sm text-white">Assets</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-medium text-sm text-white">Assets</h2>
+            {rerunMessage ? <p className="text-xs text-white/55">{rerunMessage}</p> : null}
+          </div>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {data.assets.map((asset) => (
               <div className="rounded-md border border-white/10 bg-black/20 p-3 text-xs" key={asset._id ?? `${asset.stepId}:${asset.url}`}>
@@ -98,6 +126,16 @@ export function RunProgress({ runId, fallbackStatus }: { readonly fallbackStatus
                 <a className="mt-2 inline-flex text-zap-cyan underline-offset-2 hover:underline" href={asset.url} rel="noreferrer" target="_blank">
                   Open asset
                 </a>
+                {rerunnableStepIds.has(asset.stepId) ? (
+                  <button
+                    className="ml-3 mt-2 inline-flex rounded-md border border-white/15 bg-white/10 px-2 py-1 font-medium text-white disabled:opacity-50"
+                    disabled={!canRerun || rerunBusyStep !== null}
+                    onClick={() => submitRerunFrom(asset.stepId)}
+                    type="button"
+                  >
+                    {rerunBusyStep === asset.stepId ? "Re-running" : "Re-run from here"}
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>

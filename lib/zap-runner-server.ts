@@ -634,6 +634,99 @@ export async function resumeZapRun(runId: string) {
   return getZapRunStatus(runId);
 }
 
+export async function rerunZapRunFromStep(runId: string, stepId: string, comment = `Re-run from ${stepId}.`) {
+  const snapshot = await getRunSnapshot(runId);
+  if (!snapshot.run) {
+    throw new ZapRunError({
+      code: "RUN_NOT_FOUND",
+      message: `Run ${runId} was not found.`,
+      remediation: "Check the run id returned by run_zap and retry.",
+      retryable: false,
+    });
+  }
+  if (snapshot.run.status === "running" || snapshot.run.status === "queued") {
+    throw new ZapRunError({
+      code: "INVALID_INPUT",
+      message: `Run ${runId} is already ${snapshot.run.status}.`,
+      remediation: "Wait for the current execution to finish or cancel it before re-running from a step.",
+      retryable: true,
+    });
+  }
+
+  const zap = await loadZapSpec(snapshot.run.zapSlug);
+  if (!zap) {
+    throw new ZapRunError({
+      code: "UNKNOWN_ZAP",
+      message: `Unknown Zap ${snapshot.run.zapSlug}.`,
+      remediation: "Restore the recipe used by this run or compile a new Zap from the trace.",
+      retryable: false,
+    });
+  }
+  if (!isRecord(snapshot.run.inputs)) {
+    throw new ZapRunError({
+      code: "RUN_NOT_FOUND",
+      message: `Run ${runId} does not have resumable inputs.`,
+      remediation: "Start a new run with the current runner so normalized inputs are stored in the ledger.",
+      retryable: false,
+    });
+  }
+
+  const planned = planStepsFromSnapshot(zap, snapshot);
+  const rerunIndex = planned.findIndex((step) => step.id === stepId);
+  if (rerunIndex === -1) {
+    throw new ZapRunError({
+      alternatives: snapshot.steps.map((step) => step.stepId),
+      code: "INVALID_INPUT",
+      message: `Step ${stepId} is not part of run ${runId}.`,
+      remediation: "Choose one of the step ids returned by get_run_status, then retry.",
+      retryable: false,
+    });
+  }
+
+  const existingSteps = new Map(snapshot.steps.map((step) => [step.stepId, step]));
+  const rerunSteps = planned.slice(rerunIndex);
+  await addFeedbackLedger({
+    comment,
+    kind: "rlhf_vote",
+    rater: "human",
+    runId,
+    scores: { rerunFrom: stepId, vote: "down" },
+    stepId,
+  });
+  await Promise.all(
+    rerunSteps.map((step) => {
+      const existing = existingSteps.get(step.id);
+      return upsertStepLedger({
+        kind: step.kind,
+        model: step.model ?? existing?.model,
+        priceQuoteUsd: existing?.priceQuoteUsd ?? quoteForStep(zap, runId, step, snapshot.run!.inputs as Record<string, unknown>),
+        progress: 0,
+        provider: isLocalStep(step) ? "local" : step.provider ?? zap.defaults.provider,
+        runId,
+        status: "queued",
+        stepId: step.id,
+      });
+    }),
+  );
+  await updateRunLedger({
+    costUsd: snapshot.run.costUsd,
+    runId,
+    stage: `rerun_from:${stepId}`,
+    status: "running",
+    zapUrl: snapshot.run.zapUrl,
+  });
+
+  startZapRunExecution({
+    inputs: snapshot.run.inputs,
+    live: false,
+    planned,
+    quoteUsd: snapshot.steps.reduce((sum, step) => sum + step.priceQuoteUsd, 0),
+    runId,
+    zap,
+  });
+  return getZapRunStatus(runId);
+}
+
 export async function buildGenerationRequest(
   zap: ZapSpec,
   runId: string,
