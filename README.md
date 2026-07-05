@@ -1,7 +1,7 @@
-# Zap
+# zap
 
-Zap is a content-agent framework on Eve for 1-click generative video recipes. A
-Zap is a packaged Eve skill (`agent/skills/zap-<slug>/SKILL.md`) whose
+zap is a content-agent framework on Eve for 1-click generative video recipes. A
+zaps are packaged Eve skills (`agent/skills/zap-<slug>/SKILL.md`) whose
 frontmatter describes an executable media pipeline and whose prose/prompt files
 give humans and the authoring agent creative context.
 
