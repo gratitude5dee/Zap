@@ -1,13 +1,57 @@
 import { eveChannel } from "eve/channels/eve";
-import { httpBasic, localDev, vercelOidc } from "eve/channels/auth";
+import { localDev, type AuthFn, vercelOidc } from "eve/channels/auth";
+
+const agentTokenAuth: AuthFn<Request> = async (request) => {
+  const expected = process.env.ZAP_AGENT_TOKEN;
+  if (!expected) return null;
+  const header = request.headers.get("authorization");
+  const token = header?.toLowerCase().startsWith("bearer ") ? header.slice("bearer ".length).trim() : "";
+  if (token !== expected && request.headers.get("x-zap-agent-token") !== expected) return null;
+  return {
+    attributes: { providerId: "zap-agent-token" },
+    authenticator: "zap-agent-token",
+    principalId: "zap-agent",
+    principalType: "app",
+  };
+};
+
+const supabaseSessionAuth: AuthFn<Request> = async (request) => {
+  const token = bearerToken(request) || readCookie(request.headers.get("cookie"), "zap_supabase_token");
+  if (!token) return null;
+  const apiKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!apiKey || !url) return null;
+  const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/user`, {
+    headers: {
+      apikey: apiKey,
+      authorization: `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) return null;
+  const user = await response.json() as { email?: string; id?: string };
+  if (!user.id) return null;
+  const attributes: Record<string, string> = { providerId: "supabase" };
+  if (user.email) attributes.email = user.email;
+  return {
+    attributes,
+    authenticator: "supabase",
+    principalId: user.id,
+    principalType: "user",
+  };
+};
 
 export default eveChannel({
-  auth: [
-    httpBasic({
-      username: process.env.ZAP_BASIC_USER ?? "zap",
-      password: process.env.ZAP_BASIC_PASSWORD ?? "",
-    }),
-    vercelOidc(),
-    localDev(),
-  ],
+  auth: [agentTokenAuth, supabaseSessionAuth, vercelOidc(), localDev()],
 });
+
+function bearerToken(request: Request) {
+  const header = request.headers.get("authorization");
+  return header?.toLowerCase().startsWith("bearer ") ? header.slice("bearer ".length).trim() : "";
+}
+
+function readCookie(cookieHeader: string | null, name: string) {
+  if (!cookieHeader) return "";
+  const prefix = `${name}=`;
+  const cookie = cookieHeader.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix));
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : "";
+}

@@ -17,8 +17,30 @@ export async function POST(request: Request) {
     method: "POST",
   });
   const text = await response.text();
-  return new NextResponse(text, {
+  const nextResponse = new NextResponse(text, {
     headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
     status: response.status,
   });
+  if (response.ok) {
+    const token = accessTokenFromWalletProof(text);
+    if (token) {
+      nextResponse.cookies.set("zap_supabase_token", token, {
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    }
+  }
+  return nextResponse;
+}
+
+function accessTokenFromWalletProof(text: string) {
+  try {
+    const payload = JSON.parse(text);
+    return payload.access_token ?? payload.session?.access_token ?? payload.token ?? "";
+  } catch {
+    return "";
+  }
 }

@@ -4,8 +4,9 @@ import { deadLetterProviderPoll, dequeueProviderPoll, requeueProviderPoll } from
 import { pollGeneration } from "@/lib/providers/router";
 import { getRunSnapshot } from "@/lib/run-ledger";
 import { revealZapSecretsForProviderByUserId } from "@/lib/supabase/server";
+import { listProviderAdapters } from "@wzrdtech/providers";
 
-const providers = ["gmi", "fal", "prodia", "runware"] as const;
+const providers = listProviderAdapters().map((adapter) => adapter.id);
 const maxAttempts = 24;
 
 export async function POST(request: Request) {

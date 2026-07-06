@@ -1,6 +1,6 @@
 {
   "name": "@wzrdtech/core",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": false,
   "description": "Core Zap recipe schema, planning, and registry utilities.",
   "license": "MIT",
@@ -25,7 +25,7 @@
   "bugs": {
     "url": "https://github.com/gratitude5dee/Zap/issues"
   },
-  "homepage": "https://zap.wzrd.tech",
+  "homepage": "https://zap.wzrd-tech.xyz",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

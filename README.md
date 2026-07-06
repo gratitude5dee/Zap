@@ -17,7 +17,7 @@ give humans and the authoring agent creative context.
 - Convex schema/functions for `zaps`, `runs`, `steps`, `assets`, `feedback`, and
   `cronLogs`.
 - Upstash Redis idempotency and provider queue helpers.
-- GMI Cloud, fal, Prodia, and Runware BYOK adapters behind one deterministic provider router.
+- AWS Bedrock, Vertex AI, GMI Cloud, fal, Prodia, and Runware BYOK adapters behind one deterministic provider router.
 - Workspace packages for core schema/planning, provider queues, agent helpers, and the publishable `@wzrdtech/zap`.
 
 ## Environment
@@ -28,6 +28,16 @@ Copy `.env.example` and fill production values in Vercel/Convex:
 GMI_API_KEY=
 GMI_ORG_ID=
 FAL_KEY=
+PRODIA_TOKEN=
+RUNWARE_KEY=
+VERTEX_PROJECT=
+VERTEX_LOCATION=us-central1
+VERTEX_API_KEY=
+VERTEX_SERVICE_ACCOUNT_JSON=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
+AWS_S3_OUTPUT_URI=
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 BLOB_READ_WRITE_TOKEN=
@@ -40,15 +50,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_THIRDWEB_CLIENT_ID=
 ZAP_POLL_DRAIN_URL=
 ZAP_POLL_DRAIN_SECRET=
-ZAP_BASIC_USER=
-ZAP_BASIC_PASSWORD=
+ZAP_AGENT_TOKEN=
 ```
 
 Public gallery, docs, quickstart, studio, recipe pages, and plan-only runs are open.
-Live provider spend requires a wallet-authenticated Supabase bearer token.
+Live provider spend requires a wallet-authenticated Supabase bearer token or session cookie.
 Provider webhook callbacks are public so hosted providers can report completion;
-poll drain and Eve operational endpoints still support HTTP Basic auth for
-private operations.
+poll drain uses `ZAP_POLL_DRAIN_SECRET`, and Eve operational endpoints accept
+Supabase sessions, Vercel OIDC, local dev, or `ZAP_AGENT_TOKEN`.
 
 ## Local Development
 

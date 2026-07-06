@@ -34,6 +34,15 @@ export type ZapCardRun = {
 
 export type ZapCardState = "idle" | "running" | "done" | "error";
 
+type AuraScoreResponse = {
+  readonly mode: "gateway" | "heuristic";
+  readonly model?: string;
+  readonly overall: number;
+  readonly rationale?: string;
+  readonly scores: Record<string, number>;
+  readonly verdict: "rerun" | "review" | "ship";
+};
+
 export function ZapCard({
   className,
   disabled = false,
@@ -158,6 +167,9 @@ function ZapHeroCard({
   readonly zap: PublicZapSpec;
 }) {
   const [showAura, setShowAura] = useState(false);
+  const [aura, setAura] = useState<AuraScoreResponse | null>(null);
+  const [auraError, setAuraError] = useState("");
+  const [auraLoading, setAuraLoading] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
@@ -182,6 +194,32 @@ function ZapHeroCard({
     await navigator.clipboard?.writeText(url);
     setShareToast(`${label} copied`);
     window.setTimeout(() => setShareToast(""), 1600);
+  }
+
+  async function handleAuraToggle() {
+    const next = !showAura;
+    setShowAura(next);
+    setShowShare(false);
+    if (!next || aura || auraLoading || view.state !== "done" || !run?.runId) return;
+    setAuraLoading(true);
+    setAuraError("");
+    try {
+      const response = await fetch(`/api/runs/${encodeURIComponent(run.runId)}/aura`, {
+        body: JSON.stringify({ assetUrl: view.outputUrl }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        const message = typeof payload.error === "string" ? payload.error : payload.error?.message;
+        throw new Error(message ?? "Aura scoring failed.");
+      }
+      setAura(payload as AuraScoreResponse);
+    } catch (error) {
+      setAuraError(error instanceof Error ? error.message : "Aura scoring failed.");
+    } finally {
+      setAuraLoading(false);
+    }
   }
 
   function submitFeedback() {
@@ -233,7 +271,7 @@ function ZapHeroCard({
                 Share
               </button>
             ) : null}
-            <button className="zap-card-pill" onClick={() => { setShowAura((current) => !current); setShowShare(false); }} type="button">
+            <button className="zap-card-pill" onClick={handleAuraToggle} type="button">
               <Activity className="size-3.5" />
               Aura
             </button>
@@ -410,26 +448,36 @@ function ZapHeroCard({
           </div>
           {view.state === "done" ? (
             <div className="grid gap-2">
-              {view.auraScores.map((score) => (
-                <div key={score.label}>
-                  <div className="mb-1 flex justify-between font-mono text-[10px] text-[#9db2be]">
-                    <span>{score.label}</span>
-                    <span className="text-[#00e5ff]">{score.value}</span>
+              {auraLoading ? (
+                <p className="text-[11px] text-[#7d8f9b] leading-6">Scoring final video with Aura...</p>
+              ) : auraError ? (
+                <p className="text-[11px] text-red-200 leading-6">{auraError}</p>
+              ) : aura ? (
+                <>
+                  {auraScoreRows(aura.scores).map((score) => (
+                    <div key={score.label}>
+                      <div className="mb-1 flex justify-between font-mono text-[10px] text-[#9db2be]">
+                        <span>{score.label}</span>
+                        <span className="text-[#00e5ff]">{score.value}</span>
+                      </div>
+                      <div className="h-1 rounded bg-white/10">
+                        <div className="h-full rounded bg-[#00e5ff]" style={{ width: `${score.percent}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                  <div className="mt-1 flex justify-between border-white/10 border-t border-dashed pt-2 font-mono text-[10px]">
+                    <span className="text-[#7d8f9b]">{aura.mode}{aura.model ? ` / ${aura.model}` : ""}</span>
+                    <span className="font-semibold text-[#00e5ff]">{aura.verdict}</span>
                   </div>
-                  <div className="h-1 rounded bg-white/10">
-                    <div className="h-full rounded bg-[#00e5ff]" style={{ width: `${score.percent}%` }} />
-                  </div>
-                </div>
-              ))}
-              <div className="mt-1 flex justify-between border-white/10 border-t border-dashed pt-2 font-mono text-[10px]">
-                <span className="text-[#7d8f9b]">verdict</span>
-                <span className="font-semibold text-[#00e5ff]">ship</span>
-              </div>
+                </>
+              ) : (
+                <p className="text-[11px] text-[#7d8f9b] leading-6">Open Aura to score the finalized video for shot consistency, identity lock, pacing, and virality.</p>
+              )}
             </div>
           ) : (
             <p className="text-[11px] text-[#7d8f9b] leading-6">Run the Zap, then Aura scores shot consistency, identity lock, pacing, and virality.</p>
           )}
-          <p className="mt-3 text-[9px] text-[#55646e]">Scored after finalize.</p>
+          <p className="mt-3 text-[9px] text-[#55646e]">Click-gated after output is ready.</p>
         </div>
       ) : null}
 
@@ -567,6 +615,14 @@ function SegmentBar({ compact = false, segments }: { readonly compact?: boolean;
       ))}
     </div>
   );
+}
+
+function auraScoreRows(scores: Record<string, number>) {
+  return Object.entries(scores).map(([label, score]) => ({
+    label: label.replaceAll("_", " "),
+    percent: Math.round(clamp(score, 0, 1) * 100),
+    value: score.toFixed(2),
+  }));
 }
 
 function deriveState(run?: ZapCardRun | null, error?: string | null): ZapCardState {

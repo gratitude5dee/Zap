@@ -16,17 +16,11 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isLocal(request) || hasBasicAuth(request)) {
+  if (isLocal(request) || hasAgentToken(request) || hasSupabaseSession(request)) {
     return NextResponse.next();
   }
 
-  return new NextResponse("Authentication required", {
-    headers: {
-      "cache-control": "no-store",
-      "www-authenticate": 'Basic realm="Zap"',
-    },
-    status: 401,
-  });
+  return NextResponse.json({ error: "Authentication required." }, { headers: { "cache-control": "no-store" }, status: 401 });
 }
 
 function isLocal(request: NextRequest) {
@@ -36,10 +30,12 @@ function isLocal(request: NextRequest) {
 
 function isProviderWebhook(pathname: string) {
   return [
+    "/api/providers/aws/webhook",
     "/api/providers/fal/webhook",
     "/api/providers/gmi/webhook",
     "/api/providers/prodia/webhook",
     "/api/providers/runware/webhook",
+    "/api/providers/vertex/webhook",
   ].includes(pathname);
 }
 
@@ -52,18 +48,18 @@ function hasCronSecret(request: NextRequest) {
   return Boolean(expected) && request.headers.get("x-zap-cron-secret") === expected;
 }
 
-function hasBasicAuth(request: NextRequest) {
-  const expectedUser = process.env.ZAP_BASIC_USER ?? "zap";
-  const expectedPassword = process.env.ZAP_BASIC_PASSWORD ?? "";
-  if (!expectedPassword) return false;
-
+function hasAgentToken(request: NextRequest) {
+  const expected = process.env.ZAP_AGENT_TOKEN;
+  if (!expected) return false;
   const header = request.headers.get("authorization");
-  if (!header?.startsWith("Basic ")) return false;
+  return header === `Bearer ${expected}` || request.headers.get("x-zap-agent-token") === expected;
+}
 
-  const decoded = atob(header.slice("Basic ".length));
-  const separator = decoded.indexOf(":");
-  if (separator === -1) return false;
-  return decoded.slice(0, separator) === expectedUser && decoded.slice(separator + 1) === expectedPassword;
+function hasSupabaseSession(request: NextRequest) {
+  const header = request.headers.get("authorization");
+  if (header?.toLowerCase().startsWith("bearer ")) return true;
+  if (request.cookies.has("zap_supabase_token")) return true;
+  return request.cookies.getAll().some((cookie) => cookie.name.startsWith("sb-") && cookie.name.endsWith("-auth-token"));
 }
 
 export const config = {

@@ -51,6 +51,7 @@
   --zap-muted: #64605a;
   --zap-blue: #2287ff;
   --zap-cyan: #7bd7ff;
+  --zap-data-highlight: #f6ff00;
   --zap-amber: #f2b441;
   --zap-amber-ink: #6a3d00;
   --zap-ember: #ff5c2b;
@@ -146,6 +147,15 @@ select {
     linear-gradient(180deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     #07090d;
   background-size: 42px 42px;
+}
+
+.zap-data-field {
+  background:
+    linear-gradient(90deg, rgba(248, 248, 246, 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(248, 248, 246, 0.055) 1px, transparent 1px),
+    radial-gradient(80% 70% at 18% 18%, rgba(246, 255, 0, 0.08), transparent 54%),
+    #1a1a1a;
+  background-size: 48px 48px, 48px 48px, auto, auto;
 }
 
 .zap-paper-grid {

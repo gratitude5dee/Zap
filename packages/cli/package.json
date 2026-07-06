@@ -1,6 +1,6 @@
 {
   "name": "@wzrdtech/zap",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": false,
   "description": "Agent-first CLI for creating, validating, and running Zap recipes.",
   "license": "MIT",
@@ -19,7 +19,7 @@
   "bugs": {
     "url": "https://github.com/gratitude5dee/Zap/issues"
   },
-  "homepage": "https://zap.wzrd.tech",
+  "homepage": "https://zap.wzrd-tech.xyz",
   "files": [
     "bin",
     "resources",
@@ -27,8 +27,8 @@
     "README.md"
   ],
   "dependencies": {
-    "@wzrdtech/core": "0.2.1",
-    "@wzrdtech/providers": "0.2.1",
+    "@wzrdtech/core": "0.3.0",
+    "@wzrdtech/providers": "0.3.0",
     "convex": "^1.28.0",
     "yaml": "^2.8.1"
   },

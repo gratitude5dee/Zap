@@ -70,6 +70,6 @@ steps:
   });
 
   it("exports only live BYOK provider adapters", () => {
-    expect(listProviderAdapters().map((adapter) => adapter.id).sort()).toEqual(["fal", "gmi", "prodia", "runware"]);
+    expect(listProviderAdapters().map((adapter) => adapter.id).sort()).toEqual(["aws", "fal", "gmi", "prodia", "runware", "vertex"]);
   });
 });

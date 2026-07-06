@@ -2,6 +2,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const secretTypes = new Set([
+  "aws_access_key_id",
+  "aws_region",
+  "aws_role_arn",
+  "aws_s3_output_uri",
+  "aws_secret_access_key",
+  "aws_session_token",
   "gmi_api_key",
   "gmi_org_id",
   "fal_key",
@@ -9,6 +15,11 @@ const secretTypes = new Set([
   "prodia_token",
   "openrouter_key",
   "ai_gateway_api_key",
+  "vertex_api_key",
+  "vertex_location",
+  "vertex_output_gcs_uri",
+  "vertex_project",
+  "vertex_service_account",
 ]);
 
 const corsHeaders = {
@@ -187,6 +198,8 @@ function providerFromSecretType(secretType: string) {
   if (secretType.startsWith("fal_")) return "fal";
   if (secretType.startsWith("prodia_")) return "prodia";
   if (secretType.startsWith("runware_")) return "runware";
+  if (secretType.startsWith("vertex_")) return "vertex";
+  if (secretType.startsWith("aws_")) return "aws";
   if (secretType.startsWith("openrouter_")) return "openrouter";
   if (secretType.startsWith("ai_gateway_")) return "ai_gateway";
   return secretType.replace(/_key$|_api_key$|_org_id$/g, "");
@@ -227,5 +240,5 @@ function json(payload: unknown, status = 200) {
 
 function allowedOrigin() {
   const configured = Deno.env.get("ZAP_SECRETS_ALLOWED_ORIGIN");
-  return configured && configured.length > 0 ? configured : "https://zap.wzrd.tech";
+  return configured && configured.length > 0 ? configured : "https://zap.wzrd-tech.xyz";
 }

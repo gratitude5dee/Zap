@@ -1,3 +1,4 @@
+export * from "./aws.ts";
 export * from "./errors.ts";
 export * from "./fal.ts";
 export * from "./gmi.ts";
@@ -7,3 +8,4 @@ export * from "./registry.ts";
 export * from "./runware.ts";
 export * from "./poll-queue.ts";
 export * from "./types.ts";
+export * from "./vertex.ts";

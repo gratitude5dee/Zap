@@ -28,6 +28,28 @@ export type JudgeAssetResult = {
   threshold: number;
 };
 
+export type AuraScoreInput = {
+  assetId?: string;
+  assetUrl?: string;
+  runId: string;
+  stepId?: string;
+};
+
+export type AuraScoreResult = {
+  assetId?: string;
+  feedbackId: string;
+  mode: "gateway" | "heuristic";
+  model?: string;
+  overall: number;
+  rationale?: string;
+  runId: string;
+  scores: Record<string, number>;
+  stepId: string;
+  verdict: "rerun" | "review" | "ship";
+};
+
+const auraCriteria = ["shot_consistency", "identity_lock", "pacing", "prompt_adherence", "artifact_control", "virality"];
+
 export async function judgeAsset(input: JudgeAssetInput): Promise<JudgeAssetResult> {
   const threshold = input.threshold ?? 0.7;
   const criteria = input.criteria.length > 0 ? input.criteria : ["overall_quality"];
@@ -93,6 +115,70 @@ export function judgeConfigForStep(step: ZapStep) {
   const thresholdValue = judge.threshold ?? judge.min_score ?? judge.minScore;
   const threshold = typeof thresholdValue === "number" ? thresholdValue : 0.7;
   return { criteria, threshold };
+}
+
+export async function scoreAuraVideo(input: AuraScoreInput): Promise<AuraScoreResult> {
+  const stepId = input.stepId ?? "final";
+  const asset = input.assetUrl || !input.assetId ? null : await getAssetSnapshot(input.assetId);
+  const assetUrl = input.assetUrl ?? asset?.url;
+  if (!assetUrl) {
+    throw new ZapRunError({
+      code: "RUN_NOT_FOUND",
+      message: "No video asset was found for Aura scoring.",
+      remediation: "Finish a Zap run or pass an assetUrl before requesting Aura.",
+      retryable: false,
+    });
+  }
+
+  const scored = await scoreAuraAsset({
+    assetId: input.assetId ?? "final-output",
+    assetUrl,
+    criteria: auraCriteria,
+    runId: input.runId,
+    stepId,
+  });
+  const scores = normalizeScores(scored.scores, auraCriteria, {
+    assetId: input.assetId ?? "final-output",
+    assetUrl,
+    criteria: auraCriteria,
+    runId: input.runId,
+    stepId,
+  });
+  const overall = scored.overall === undefined
+    ? clampScore(Object.values(scores).reduce((sum, score) => sum + score, 0) / auraCriteria.length)
+    : clampScore(scored.overall);
+  const verdict = scored.verdict ?? (overall >= 0.84 ? "ship" : overall >= 0.68 ? "review" : "rerun");
+  const feedbackId = await addFeedbackLedger({
+    assetId: input.assetId,
+    comment: `Aura ${verdict} at ${overall.toFixed(2)}.`,
+    kind: "aura_score",
+    rater: scored.mode === "gateway" ? "vlm" : "heuristic",
+    runId: input.runId,
+    scores: {
+      criteria: auraCriteria,
+      gatewayError: scored.gatewayError,
+      mode: scored.mode,
+      model: scored.model,
+      overall,
+      rationale: scored.rationale,
+      scores,
+      verdict,
+    },
+    stepId,
+  });
+
+  return {
+    assetId: input.assetId,
+    feedbackId,
+    mode: scored.mode,
+    model: scored.model,
+    overall,
+    rationale: scored.rationale,
+    runId: input.runId,
+    scores,
+    stepId,
+    verdict,
+  };
 }
 
 export function judgeFailurePayload(result: JudgeAssetResult) {
@@ -162,6 +248,72 @@ async function scoreAsset(input: JudgeAssetInput & { assetUrl: string; criteria:
     }
   }
   return scoreWithHeuristic(input);
+}
+
+async function scoreAuraAsset(input: JudgeAssetInput & { assetUrl: string; criteria: string[] }): Promise<{
+  gatewayError?: string;
+  mode: "gateway" | "heuristic";
+  model?: string;
+  overall?: number;
+  rationale?: string;
+  scores: Record<string, number>;
+  verdict?: "rerun" | "review" | "ship";
+}> {
+  const model = process.env.ZAP_AURA_MODEL ?? "google/gemini-3.5-flash";
+  if (shouldUseGatewayJudge(input.assetUrl)) {
+    try {
+      const scored = await scoreAuraWithGateway(input, model);
+      return { ...scored, mode: "gateway", model };
+    } catch (error) {
+      const heuristic = scoreWithHeuristic(input);
+      return {
+        ...heuristic,
+        gatewayError: error instanceof Error ? error.message : "Aura gateway failed.",
+        rationale: "AI Gateway Aura scorer unavailable; deterministic heuristic fallback used.",
+      };
+    }
+  }
+  return scoreWithHeuristic(input);
+}
+
+async function scoreAuraWithGateway(input: JudgeAssetInput & { assetUrl: string; criteria: string[] }, model: string) {
+  const schema = z.object({
+    overall: z.number().min(0).max(1).optional(),
+    rationale: z.string().max(1200).optional(),
+    scores: z.record(z.string(), z.number().min(0).max(1)),
+    verdict: z.enum(["rerun", "review", "ship"]).optional(),
+  });
+  const mediaUrl = new URL(input.assetUrl);
+  const messages: ModelMessage[] = [
+    {
+      content: [
+        {
+          text: [
+            "Score this generated Zap video for final-share readiness.",
+            "Return scores from 0 to 1 for shot consistency, identity lock, pacing, prompt adherence, artifact control, and virality.",
+            "Choose verdict ship only when the video is coherent, visually stable, and shareable without manual fixes.",
+            `Criteria: ${input.criteria.join(", ")}`,
+          ].join("\n"),
+          type: "text",
+        },
+        {
+          data: mediaUrl,
+          mediaType: inferMediaType(input.assetUrl),
+          type: "file",
+        },
+      ],
+      role: "user",
+    },
+  ];
+
+  const result = await generateObject({
+    instructions: "You are Aura, Zap's strict video quality and virality scorer. Return only the requested object.",
+    messages,
+    model: gateway(model),
+    schema,
+    temperature: 0,
+  });
+  return result.object;
 }
 
 async function scoreWithGateway(input: JudgeAssetInput & { assetUrl: string; criteria: string[] }, model: string) {

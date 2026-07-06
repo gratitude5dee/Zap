@@ -3,11 +3,22 @@ import type { ZapProvider, ZapStepKind } from "@wzrdtech/core";
 export type Capability = ZapStepKind;
 export type ProviderId = ZapProvider;
 export type ProviderSecretName =
+  | "aws_access_key_id"
+  | "aws_region"
+  | "aws_role_arn"
+  | "aws_s3_output_uri"
+  | "aws_secret_access_key"
+  | "aws_session_token"
   | "gmi_api_key"
   | "gmi_org_id"
   | "fal_key"
   | "prodia_token"
-  | "runware_key";
+  | "runware_key"
+  | "vertex_api_key"
+  | "vertex_location"
+  | "vertex_output_gcs_uri"
+  | "vertex_project"
+  | "vertex_service_account";
 export type ProviderSecrets = Partial<Record<ProviderSecretName, string>>;
 
 export type GenRequest = {

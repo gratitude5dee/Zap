@@ -15,12 +15,16 @@ describe("Supabase BYOK secret contract", () => {
     expect(requiredSecretTypesForProvider("fal")).toEqual(["fal_key"]);
     expect(requiredSecretTypesForProvider("prodia")).toEqual(["prodia_token"]);
     expect(requiredSecretTypesForProvider("runware")).toEqual(["runware_key"]);
+    expect(requiredSecretTypesForProvider("vertex")).toEqual(["vertex_project", "vertex_location", "vertex_api_key", "vertex_service_account", "vertex_output_gcs_uri"]);
+    expect(requiredSecretTypesForProvider("aws")).toEqual(["aws_access_key_id", "aws_secret_access_key", "aws_session_token", "aws_region", "aws_s3_output_uri", "aws_role_arn"]);
     expect(requiredSecretTypesForProvider("openrouter")).toEqual(["openrouter_key"]);
   });
 
   it("masks and classifies secret metadata", () => {
     expect(maskSecret("sk-123456")).toBe("****3456");
     expect(providerFromSecretType("gmi_api_key")).toBe("gmi");
+    expect(providerFromSecretType("vertex_project")).toBe("vertex");
+    expect(providerFromSecretType("aws_s3_output_uri")).toBe("aws");
     expect(providerFromSecretType("ai_gateway_api_key")).toBe("ai_gateway");
   });
 

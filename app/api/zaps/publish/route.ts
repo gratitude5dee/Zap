@@ -4,17 +4,24 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isReservedSlug } from "@/lib/reserved-slugs";
 import { parseZapMarkdown } from "@/lib/zap-schema";
+import { publicZapOrigin } from "@/lib/zap-urls";
 
 const upsertZap = makeFunctionReference<"mutation">("zaps:upsert");
+const finalizeZap = makeFunctionReference<"mutation">("zaps:finalize");
 
 const publishSchema = z.object({
   authorId: z.string().optional(),
   compiledFromRunId: z.string().optional(),
+  description: z.string().optional(),
+  finalize: z.boolean().default(false),
+  finalizedBy: z.string().optional(),
+  heroAssetUrl: z.string().url().optional(),
   prompts: z.record(z.string(), z.string()).default({}),
   slug: z.string().optional(),
   source: z.unknown().optional(),
-  status: z.enum(["draft", "published"]).default("published"),
+  status: z.enum(["draft", "published"]).default("draft"),
   tags: z.array(z.string()).default([]),
+  title: z.string().optional(),
   zapMd: z.string().optional(),
 });
 
@@ -41,23 +48,39 @@ export async function POST(request: Request) {
 
   const client = new ConvexHttpClient(convexUrl);
   const source = JSON.stringify({ prompts: input.prompts, zapMd });
+  const status = input.finalize ? "published" : input.status;
   const id = await client.mutation(upsertZap, {
     authorId: input.authorId,
     compiledFromRunId: input.compiledFromRunId,
+    description: input.description ?? spec.description,
     estimateUsd: spec.budget.estimate_usd,
+    heroAssetUrl: input.heroAssetUrl,
     slug,
     source,
-    status: input.status,
+    status,
     tags: input.tags,
+    title: input.title,
     version: spec.version,
   });
+  if (input.finalize) {
+    await client.mutation(finalizeZap, {
+      authorId: input.authorId,
+      compiledFromRunId: input.compiledFromRunId,
+      description: input.description ?? spec.description,
+      finalizedBy: input.finalizedBy ?? input.authorId,
+      heroAssetUrl: input.heroAssetUrl,
+      slug,
+      tags: input.tags,
+      title: input.title,
+    });
+  }
 
   return NextResponse.json({
     canonicalUrl: publicUrl(`/${slug}`),
     embedUrl: publicUrl(`/embed/${slug}`),
     id,
     slug,
-    status: input.status,
+    status,
     version: spec.version,
   });
 }
@@ -78,11 +101,5 @@ function bearerToken(request: Request) {
 }
 
 function publicUrl(pathname: string) {
-  const base = process.env.ZAP_PUBLIC_BASE_URL
-    ?? process.env.NEXT_PUBLIC_SITE_URL
-    ?? process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ?? process.env.VERCEL_URL
-    ?? "https://zap.wzrd.tech";
-  const normalized = base.startsWith("http://") || base.startsWith("https://") ? base : `https://${base}`;
-  return `${normalized.replace(/\/$/, "")}${pathname}`;
+  return `${publicZapOrigin()}${pathname}`;
 }

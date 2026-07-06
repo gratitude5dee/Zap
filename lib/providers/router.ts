@@ -103,21 +103,22 @@ function selectProviderById(provider: string) {
   if (provider === "mock") {
     throw new ZapRunError({
       code: "PROVIDER_UNSUPPORTED",
-      message: "provider: mock is not supported in Zap v0.2.0.",
-      remediation: "Use dry-run planning for zero-spend validation, or choose gmi, fal, prodia, or runware for live work.",
+      message: "provider: mock is not supported in Zap v0.3.0.",
+      remediation: `Use dry-run planning for zero-spend validation, or choose ${adapters.map((adapter) => adapter.id).join(", ")} for live work.`,
       retryable: false,
     });
   }
-  if (provider !== "gmi" && provider !== "fal" && provider !== "prodia" && provider !== "runware") {
+  const adapter = getProviderAdapter(provider);
+  if (!adapter) {
     throw new ZapRunError({
-      alternatives: ["gmi", "fal", "prodia", "runware"],
+      alternatives: adapters.map((candidate) => candidate.id),
       code: "PROVIDER_UNSUPPORTED",
       message: `Unknown provider ${provider}.`,
       remediation: "Choose a supported provider id.",
       retryable: false,
     });
   }
-  return getProviderAdapter(provider as ProviderId);
+  return adapter;
 }
 
 export function buildIdempotencyKey(req: GenRequest) {

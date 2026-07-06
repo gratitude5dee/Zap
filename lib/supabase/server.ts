@@ -22,6 +22,18 @@ export function getBearerToken(request: Request) {
   return header.slice("bearer ".length).trim();
 }
 
+export function getRequestAccessToken(request: Request) {
+  return getBearerToken(request) || readCookie(request.headers.get("cookie"), "zap_supabase_token");
+}
+
+function readCookie(cookieHeader: string | null, name: string) {
+  if (!cookieHeader) return "";
+  const cookies = cookieHeader.split(";").map((part) => part.trim());
+  const prefix = `${name}=`;
+  const cookie = cookies.find((part) => part.startsWith(prefix));
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : "";
+}
+
 export async function callSupabaseFunction<T>(functionName: string, options: SupabaseEdgeOptions): Promise<T> {
   const { apiKey, url } = getSupabasePublicConfig();
   if (!url || !apiKey) {

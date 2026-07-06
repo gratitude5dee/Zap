@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const cli = path.resolve("packages/cli/bin/zap.js");
-const cliVersion = "0.2.1";
+const cliVersion = "0.3.0";
 
 function runZap(cwd: string, args: string[]) {
   return execFileSync(process.execPath, [cli, ...args], {

@@ -6,10 +6,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseZapMarkdown, validateZapPromptTemplates } from "@wzrdtech/core/schema";
-import { defaultModelFor, getProviderAdapter } from "@wzrdtech/providers";
-import { stringify } from "yaml";
+import { defaultModelFor, getProviderAdapter, listProviderAdapters } from "@wzrdtech/providers";
+import { parseDocument, stringify } from "yaml";
 
-const version = "0.2.1";
+const version = "0.3.0";
 const commands = [
   "init",
   "new",
@@ -21,6 +21,9 @@ const commands = [
   "studio",
   "add",
   "docs",
+  "finalize",
+  "gallery",
+  "import",
   "skills",
   "doctor",
   "embed",
@@ -30,6 +33,7 @@ const commands = [
   "login",
   "logout",
   "deploy",
+  "mcp",
   "upgrade",
   "improve",
   "feedback",
@@ -94,6 +98,15 @@ async function main(argv) {
     case "docs":
       await docsCommand(args.slice(1), flags);
       break;
+    case "finalize":
+      await finalizeCommand(args.slice(1), flags);
+      break;
+    case "gallery":
+      await galleryCommand(args.slice(1), flags);
+      break;
+    case "import":
+      await importCommand(args.slice(1), flags);
+      break;
     case "skills":
       await skillsCommand(args.slice(1), flags);
       break;
@@ -120,6 +133,9 @@ async function main(argv) {
       break;
     case "deploy":
       await deployCommand(args.slice(1), flags);
+      break;
+    case "mcp":
+      await mcpCommand(flags);
       break;
     case "upgrade":
       await upgradeCommand(flags);
@@ -511,6 +527,236 @@ async function docsCommand(args, flags) {
   else console.log(content);
 }
 
+async function galleryCommand(args, flags) {
+  const auth = await readAuthStore();
+  const apiBase = String(flags.apiUrl ?? auth.apiUrl ?? process.env.ZAP_API_URL ?? "https://zap.wzrd-tech.xyz").replace(/\/$/, "");
+  if (flags.remote) {
+    const response = await fetch(`${apiBase}/api/zaps`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error ?? `Gallery request failed with ${response.status}.`);
+    if (flags.json) printJson(payload);
+    else (payload.zaps ?? []).forEach((zap) => console.log(`${zap.zap} ${zap.title ?? ""} $${Number(zap.budget?.estimate_usd ?? 0).toFixed(2)}`));
+    return;
+  }
+
+  const files = await resolveZapFiles(args);
+  const zaps = [];
+  for (const file of files) {
+    const spec = await parseZapFile(file);
+    zaps.push({
+      estimateUsd: spec.budget.estimate_usd,
+      file,
+      slug: spec.zap,
+      steps: spec.steps.length,
+      title: titleize(spec.zap),
+    });
+  }
+  if (flags.json) printJson({ zaps });
+  else zaps.forEach((zap) => console.log(`${zap.slug} ${zap.steps} step(s) $${zap.estimateUsd.toFixed(2)} ${zap.file}`));
+}
+
+async function finalizeCommand(args, flags) {
+  const slug = args[0] ?? flags.slug;
+  if (!slug) throw new Error("Usage: zap finalize <slug> [--token ...] [--api-url ...]");
+  const auth = await readAuthStore();
+  const token = String(flags.token ?? auth.token ?? process.env.ZAP_TOKEN ?? "");
+  if (!token) throw new Error("zap finalize requires `zap login --token ...`, --token, or ZAP_TOKEN.");
+  const apiBase = String(flags.apiUrl ?? auth.apiUrl ?? process.env.ZAP_API_URL ?? "https://zap.wzrd-tech.xyz").replace(/\/$/, "");
+  const body = {
+    finalizedBy: flags.finalizedBy,
+    heroAssetUrl: flags.heroAssetUrl,
+    tags: parseCsvFlag(flags.tags),
+    title: flags.title,
+  };
+  const response = await fetch(`${apiBase}/api/zaps/${encodeURIComponent(slug)}/finalize`, {
+    body: JSON.stringify(body),
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    method: "POST",
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error ?? `Finalize failed with ${response.status}.`);
+  if (flags.json) printJson(payload);
+  else console.log(`Finalized ${payload.slug ?? slug} on ${apiBase}`);
+}
+
+async function importCommand(args, flags) {
+  assertZapProject(process.cwd());
+  const source = args[0] ?? flags.from;
+  if (source === "hyperframes") return importHyperframes(flags);
+  if (source === "openmontage") return importOpenMontage(flags);
+  throw new Error("Usage: zap import <hyperframes|openmontage> [--source path] [--limit n] [--force]");
+}
+
+async function importHyperframes(flags) {
+  const registryFile = path.resolve(process.cwd(), String(flags.source ?? "../hyperframes-main/registry/registry.json"));
+  const registry = JSON.parse(await fs.readFile(registryFile, "utf8"));
+  await ensureDesignBrief();
+  const names = parseCsvFlag(flags.name);
+  const limit = Number(flags.limit ?? 12);
+  const items = (registry.items ?? [])
+    .filter((item) => names.length === 0 || names.includes(item.name))
+    .slice(0, Number.isFinite(limit) && limit > 0 ? limit : undefined);
+  const imported = [];
+  for (const item of items) {
+    const slug = `hf-${slugify(item.name)}`;
+    const skillDir = await writeImportedZap({
+      description: `HyperFrames ${item.name} template packaged as a Zap recipe.`,
+      metadata: { source: "hyperframes", template: item.name, type: item.type },
+      prompts: {
+        "prompts/initial-frame.md": `Create a strong visual frame for {PROMPT} that fits the HyperFrames template "${item.name}".\n`,
+        "prompts/initial-gen.md": `Animate the frame into a short polished video for {PROMPT}. Preserve the visual grammar of "${item.name}".\n`,
+      },
+      slug,
+      stitch: { engine: "hyperframes", format: "mp4", inputs: { template: item.name }, quality: "standard", template: item.name },
+      title: `HyperFrames ${titleize(item.name)}`,
+    }, flags);
+    imported.push({ skillDir, slug, template: item.name });
+  }
+  if (flags.json) printJson({ imported, registryFile });
+  else imported.forEach((entry) => console.log(`Imported ${entry.template} -> zap-${entry.slug}`));
+}
+
+async function ensureDesignBrief() {
+  await writeNewFile(path.join(process.cwd(), "DESIGN.md"), [
+    "# Zap Design Brief",
+    "",
+    "- Use the imported HyperFrames template as the motion/layout reference.",
+    "- Keep typography high-contrast, legible, and aligned to the recipe prompt.",
+    "- Avoid decorative filler that hides generated media or text.",
+    "",
+  ].join("\n"));
+}
+
+async function importOpenMontage(flags) {
+  const pipelinesDir = path.resolve(process.cwd(), String(flags.source ?? "../OpenMontage-main/pipeline_defs"));
+  const names = parseCsvFlag(flags.name);
+  const files = (await fs.readdir(pipelinesDir))
+    .filter((file) => file.endsWith(".yaml") || file.endsWith(".yml"))
+    .filter((file) => names.length === 0 || names.includes(file.replace(/\.ya?ml$/, "")))
+    .sort();
+  const limit = Number(flags.limit ?? files.length);
+  const imported = [];
+  for (const fileName of files.slice(0, Number.isFinite(limit) && limit > 0 ? limit : undefined)) {
+    const file = path.join(pipelinesDir, fileName);
+    const pipeline = parseDocument(await fs.readFile(file, "utf8")).toJS() ?? {};
+    const name = String(pipeline.name ?? fileName.replace(/\.ya?ml$/, ""));
+    const slug = `om-${slugify(name)}`;
+    const stageNames = Array.isArray(pipeline.stages) ? pipeline.stages.map((stage) => stage?.name).filter(Boolean) : [];
+    const skillDir = await writeImportedZap({
+      description: String(pipeline.description ?? `OpenMontage ${name} pipeline packaged as a Zap recipe.`).replace(/\s+/g, " ").trim(),
+      metadata: {
+        category: pipeline.category,
+        source: "openmontage",
+        stability: pipeline.stability,
+        stages: stageNames,
+      },
+      prompts: {
+        "prompts/initial-frame.md": `Create a reference frame for an OpenMontage ${name} production: {PROMPT}\n`,
+        "prompts/initial-gen.md": `Generate a short ${name} sequence from the approved frame: {PROMPT}\n`,
+      },
+      slug,
+      stitch: { engine: "auto", format: "mp4", inputs: { pipeline: name, stages: stageNames }, quality: "standard", template: `openmontage:${name}` },
+      title: `OpenMontage ${titleize(name)}`,
+    }, flags);
+    imported.push({ pipeline: name, skillDir, slug });
+  }
+  if (flags.json) printJson({ imported, pipelinesDir });
+  else imported.forEach((entry) => console.log(`Imported ${entry.pipeline} -> zap-${entry.slug}`));
+}
+
+async function writeImportedZap({ description, metadata, prompts, slug, stitch, title }, flags) {
+  const skillDir = path.join(process.cwd(), "agent", "skills", `zap-${slug}`);
+  await fs.mkdir(path.join(skillDir, "prompts"), { recursive: true });
+  const zapMd = [
+    "---",
+    stringify({
+      budget: { cap_usd: 5, estimate_usd: 0.25 },
+      defaults: {
+        models: {
+          "image.gen": "fal-ai/flux/dev",
+          "video.gen": "fal-ai/kling-video/v2.1/pro/image-to-video",
+        },
+        provider: "fal",
+      },
+      description,
+      inputs: {
+        PROMPT: {
+          hint: "Describe the piece to produce.",
+          label: "Prompt",
+          required: true,
+          type: "textarea",
+        },
+      },
+      output: "Zap.mp4",
+      publish: { slug, visibility: "public" },
+      steps: [
+        {
+          id: "initial_frame",
+          kind: "image.gen",
+          model: "fal-ai/flux/dev",
+          prompt: "prompts/initial-frame.md",
+          provider: "fal",
+        },
+        {
+          duration_s: 8,
+          id: "initial_gen",
+          inputs: ["initial_frame"],
+          kind: "video.gen",
+          model: "fal-ai/kling-video/v2.1/pro/image-to-video",
+          prompt: "prompts/initial-gen.md",
+          provider: "fal",
+        },
+        {
+          id: "stitch",
+          inputs: ["initial_gen"],
+          kind: "stitch",
+          stitch,
+        },
+      ],
+      version: 2,
+      x_source: metadata,
+      zap: slug,
+    }).trim(),
+    "---",
+    "",
+    `# ${title}`,
+    "",
+  ].join("\n");
+  await writeRecipeFile(path.join(skillDir, "SKILL.md"), `# zap-${slug}\n\nUse this skill when a creator wants ${title}.\n`, flags.force);
+  await writeRecipeFile(path.join(skillDir, "Zap.md"), zapMd, flags.force);
+  for (const [promptPath, content] of Object.entries(prompts)) {
+    await writeRecipeFile(path.join(skillDir, promptPath), content, flags.force);
+  }
+  return skillDir;
+}
+
+async function mcpCommand(flags) {
+  if (flags.json) {
+    printJson({
+      command: "zap mcp",
+      tools: ["validate_zap", "inspect_zap", "list_gallery"],
+      transport: "stdio",
+    });
+    return;
+  }
+  process.stdin.setEncoding("utf8");
+  process.stdin.resume();
+  let buffer = "";
+  process.stdin.on("data", async (chunk) => {
+    buffer += chunk;
+    const messages = [];
+    while (true) {
+      const parsed = takeMcpMessage(buffer);
+      if (!parsed) break;
+      messages.push(parsed.message);
+      buffer = parsed.rest;
+    }
+    for (const message of messages) {
+      await respondToMcp(message);
+    }
+  });
+}
+
 async function skillsCommand(args, flags) {
   const subcommand = args[0] ?? "generate";
   const resourceRoot = findResourceRoot();
@@ -553,8 +799,8 @@ async function doctorCommand(flags) {
 
 async function embedCommand(args, flags) {
   const slug = args[0] ?? flags.slug;
-  if (!slug) throw new Error("Usage: zap embed <slug> [--base-url https://zap.wzrd.tech] [--json]");
-  const baseUrl = String(flags.baseUrl ?? process.env.ZAP_PUBLIC_BASE_URL ?? "https://zap.wzrd.tech").replace(/\/$/, "");
+  if (!slug) throw new Error("Usage: zap embed <slug> [--base-url https://zap.wzrd-tech.xyz] [--json]");
+  const baseUrl = String(flags.baseUrl ?? process.env.ZAP_PUBLIC_ORIGIN ?? process.env.ZAP_PUBLIC_BASE_URL ?? "https://zap.wzrd-tech.xyz").replace(/\/$/, "");
   const iframe = `<iframe src="${baseUrl}/embed/${slug}" width="1280" height="720" loading="lazy" allow="clipboard-write; fullscreen"></iframe>`;
   const oembed = `${baseUrl}/api/oembed?url=${encodeURIComponent(`${baseUrl}/${slug}`)}`;
   if (flags.json) printJson({ iframe, oembed, slug });
@@ -653,7 +899,7 @@ async function keysRemove(args, flags) {
 
 async function keysTest(args, flags) {
   const provider = args[0] ?? flags.provider;
-  const providers = provider ? [provider] : ["gmi", "fal", "prodia", "runware"];
+  const providers = provider ? [provider] : supportedProviderIds();
   const credentials = await readCredentialStore();
   const results = [];
   for (const id of providers) {
@@ -669,7 +915,7 @@ async function keysSync(flags) {
   const auth = await readAuthStore();
   const token = String(flags.token ?? auth.token ?? process.env.ZAP_TOKEN ?? "");
   if (!token) throw new Error("zap keys sync requires `zap login --token ...` or ZAP_TOKEN.");
-  const apiBase = String(flags.apiUrl ?? auth.apiUrl ?? process.env.ZAP_API_URL ?? "https://zap.wzrd.tech").replace(/\/$/, "");
+  const apiBase = String(flags.apiUrl ?? auth.apiUrl ?? process.env.ZAP_API_URL ?? "https://zap.wzrd-tech.xyz").replace(/\/$/, "");
   const credentials = await readCredentialStore();
   const synced = [];
   for (const [secretType, entry] of Object.entries(credentials.secrets)) {
@@ -687,8 +933,8 @@ async function keysSync(flags) {
 
 async function loginCommand(flags) {
   const token = String(flags.token ?? process.env.ZAP_TOKEN ?? "");
-  if (!token) throw new Error("Usage: zap login --token <token> [--api-url https://zap.wzrd.tech]");
-  const apiUrl = String(flags.apiUrl ?? process.env.ZAP_API_URL ?? "https://zap.wzrd.tech").replace(/\/$/, "");
+  if (!token) throw new Error("Usage: zap login --token <token> [--api-url https://zap.wzrd-tech.xyz]");
+  const apiUrl = String(flags.apiUrl ?? process.env.ZAP_API_URL ?? "https://zap.wzrd-tech.xyz").replace(/\/$/, "");
   await writeAuthStore({ apiUrl, token });
   if (flags.json) printJson({ apiUrl, ok: true });
   else console.log(`Logged in to ${apiUrl}`);
@@ -703,20 +949,21 @@ async function logoutCommand(flags) {
 
 async function deployCommand(args, flags) {
   const file = (await resolveZapFiles(args))[0];
-  if (!file) throw new Error("Usage: zap deploy <slug|Zap.md> [--json]");
+  if (!file) throw new Error("Usage: zap deploy <slug|Zap.md> [--finalize] [--json]");
   const spec = await parseZapFile(file);
   const auth = await readAuthStore();
   const token = String(flags.token ?? auth.token ?? process.env.ZAP_TOKEN ?? "");
-  const apiBase = String(flags.apiUrl ?? auth.apiUrl ?? process.env.ZAP_API_URL ?? "https://zap.wzrd.tech").replace(/\/$/, "");
+  const apiBase = String(flags.apiUrl ?? auth.apiUrl ?? process.env.ZAP_API_URL ?? "https://zap.wzrd-tech.xyz").replace(/\/$/, "");
   const body = await bundleZapSource(file, spec);
-  body.status = flags.draft ? "draft" : "published";
+  body.finalize = Boolean(flags.finalize);
+  body.status = flags.finalize ? "published" : "draft";
   if (!token) {
     const dir = path.join(process.cwd(), ".zap", "deployments");
     await fs.mkdir(dir, { recursive: true });
     const target = path.join(dir, `${spec.zap}.json`);
     await fs.writeFile(target, JSON.stringify(body, null, 2) + "\n");
     if (flags.json) printJson({ file: target, ok: true, offline: true, slug: spec.zap });
-    else console.log(`Prepared offline deployment ${target}`);
+    else console.log(`Prepared offline ${body.status} deployment ${target}`);
     return;
   }
   const response = await fetch(`${apiBase}/api/zaps/publish`, {
@@ -727,7 +974,7 @@ async function deployCommand(args, flags) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error ?? `Deploy failed with ${response.status}.`);
   if (flags.json) printJson(payload);
-  else console.log(`Deployed ${payload.slug ?? spec.zap} to ${apiBase}/${payload.slug ?? spec.zap}`);
+  else console.log(`${payload.status === "published" ? "Finalized" : "Deployed draft"} ${payload.slug ?? spec.zap} at ${apiBase}/${payload.slug ?? spec.zap}`);
 }
 
 async function upgradeCommand(flags) {
@@ -897,6 +1144,122 @@ function secretsForProvider(store, provider) {
   return secrets;
 }
 
+function takeMcpMessage(buffer) {
+  const headerEnd = buffer.indexOf("\r\n\r\n");
+  if (headerEnd !== -1) {
+    const header = buffer.slice(0, headerEnd);
+    const lengthMatch = header.match(/content-length:\s*(\d+)/i);
+    if (!lengthMatch) throw new Error("MCP message missing Content-Length.");
+    const length = Number(lengthMatch[1]);
+    const bodyStart = headerEnd + 4;
+    const bodyEnd = bodyStart + length;
+    if (buffer.length < bodyEnd) return null;
+    return { message: JSON.parse(buffer.slice(bodyStart, bodyEnd)), rest: buffer.slice(bodyEnd) };
+  }
+
+  const newline = buffer.indexOf("\n");
+  if (newline === -1 || !buffer.trimStart().startsWith("{")) return null;
+  return { message: JSON.parse(buffer.slice(0, newline)), rest: buffer.slice(newline + 1) };
+}
+
+async function respondToMcp(message) {
+  if (!message || message.method === "notifications/initialized") return;
+  try {
+    if (message.method === "initialize") {
+      writeMcp({
+        id: message.id,
+        jsonrpc: "2.0",
+        result: {
+          capabilities: { tools: {} },
+          protocolVersion: message.params?.protocolVersion ?? "2025-06-18",
+          serverInfo: { name: "zap-cli", version },
+        },
+      });
+      return;
+    }
+    if (message.method === "tools/list") {
+      writeMcp({
+        id: message.id,
+        jsonrpc: "2.0",
+        result: {
+          tools: [
+            {
+              description: "Validate a Zap.md recipe.",
+              inputSchema: { properties: { file: { type: "string" } }, type: "object" },
+              name: "validate_zap",
+            },
+            {
+              description: "Inspect a Zap recipe quote and step plan.",
+              inputSchema: { properties: { file: { type: "string" } }, type: "object" },
+              name: "inspect_zap",
+            },
+            {
+              description: "List local Zap recipes in the current project.",
+              inputSchema: { properties: {}, type: "object" },
+              name: "list_gallery",
+            },
+          ],
+        },
+      });
+      return;
+    }
+    if (message.method === "tools/call") {
+      const result = await callMcpTool(message.params?.name, message.params?.arguments ?? {});
+      writeMcp({
+        id: message.id,
+        jsonrpc: "2.0",
+        result: { content: [{ text: JSON.stringify(result, null, 2), type: "text" }] },
+      });
+      return;
+    }
+    writeMcp({ error: { code: -32601, message: `Unknown method ${message.method}` }, id: message.id, jsonrpc: "2.0" });
+  } catch (error) {
+    writeMcp({
+      error: { code: -32000, message: error instanceof Error ? error.message : String(error) },
+      id: message.id,
+      jsonrpc: "2.0",
+    });
+  }
+}
+
+async function callMcpTool(name, args) {
+  if (name === "validate_zap") {
+    const file = (await resolveZapFiles(args.file ? [args.file] : []))[0];
+    if (!file) throw new Error("No Zap.md file found.");
+    const spec = await parseZapFile(file);
+    validateSpec(spec);
+    return { file, ok: true, zap: spec.zap };
+  }
+  if (name === "inspect_zap") {
+    const file = (await resolveZapFiles(args.file ? [args.file] : []))[0];
+    if (!file) throw new Error("No Zap.md file found.");
+    const spec = await parseZapFile(file);
+    const steps = expandSteps(spec, Number(args.extend ?? 0));
+    return {
+      budget: spec.budget,
+      file,
+      quoteUsd: estimateUsd(spec, steps),
+      steps: steps.map((step) => plannedStep(spec, step)),
+      zap: spec.zap,
+    };
+  }
+  if (name === "list_gallery") {
+    const files = await resolveZapFiles([]);
+    const zaps = [];
+    for (const file of files) {
+      const spec = await parseZapFile(file);
+      zaps.push({ estimateUsd: spec.budget.estimate_usd, file, slug: spec.zap, steps: spec.steps.length });
+    }
+    return { zaps };
+  }
+  throw new Error(`Unknown tool ${name}.`);
+}
+
+function writeMcp(message) {
+  const body = JSON.stringify(message);
+  process.stdout.write(`Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`);
+}
+
 function parseArgs(argv) {
   const flags = {};
   const args = [];
@@ -922,6 +1285,12 @@ function parseArgs(argv) {
     }
   }
   return { args, flags };
+}
+
+function parseCsvFlag(value) {
+  if (!value) return [];
+  const values = Array.isArray(value) ? value : [value];
+  return values.flatMap((item) => String(item).split(",").map((entry) => entry.trim()).filter(Boolean));
 }
 
 function setFlag(flags, key, value) {
@@ -1003,8 +1372,9 @@ function withPlanInputDefaults(spec, inputs, live) {
 
 function lintSpec(spec) {
   const warnings = [];
-  if (!["gmi", "fal", "prodia", "runware"].includes(spec.defaults?.provider)) {
-    warnings.push("defaults.provider must be one of gmi, fal, prodia, or runware.");
+  const providers = supportedProviderIds();
+  if (!providers.includes(spec.defaults?.provider)) {
+    warnings.push(`defaults.provider must be one of ${providers.join(", ")}.`);
   }
   if (Number(spec.budget?.cap_usd ?? 0) <= 0) warnings.push("budget.cap_usd should be positive.");
   if (!spec.steps.some((step) => step.kind === "stitch")) warnings.push("Zap should end with a stitch step.");
@@ -1072,6 +1442,10 @@ function extensionFromUrl(url) {
 
 function isLocalStep(step) {
   return step.kind === "stitch" || step.kind === "keyframes";
+}
+
+function supportedProviderIds() {
+  return listProviderAdapters().map((adapter) => adapter.id).sort();
 }
 
 function sleep(ms) {
@@ -1433,11 +1807,15 @@ Commands:
   lint [Zap.md]       Run recipe policy checks
   run <Zap.md>        Plan a Zap by default; use --live to submit providers
   status [runId]      Show local run status
+  gallery             List local recipes; add --remote for hosted gallery
   keys                Manage encrypted BYOK provider keys
   login/logout        Store or remove a Zap API token
-  deploy <Zap.md>     Publish a Zap to the hosted API
+  deploy <Zap.md>     Upload a draft Zap to the hosted API
+  finalize <slug>     Finalize a deployed draft into the gallery
+  import <source>     Import hyperframes or openmontage templates
   inspect <Zap.md>    Show provider/model plan details
   embed <slug>        Print iframe/oEmbed embed snippets
+  mcp                 Start the Zap MCP stdio server
   dev                 Start the web app dev server
   studio              Start the web studio
   add <name>          Add a registry Zap

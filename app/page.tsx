@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import {
   ArrowRight,
@@ -19,11 +20,11 @@ import { ZapCard } from "@/app/_components/zap-card";
 import { ZAP_DOCS_URL } from "@/lib/zap-urls";
 import { listZapSpecs } from "@/lib/zap-files";
 
-const cliProof = `npx @wzrdtech/zap@0.2.0 init match-day
+const cliProof = `npx @wzrdtech/zap@0.3.0 init match-day
 cd match-day
-npx @wzrdtech/zap@0.2.0 new world-cup-entrance
-npx @wzrdtech/zap@0.2.0 validate
-npx @wzrdtech/zap@0.2.0 run agent/skills/zap-world-cup-entrance/Zap.md --json
+npx @wzrdtech/zap@0.3.0 new world-cup-entrance
+npx @wzrdtech/zap@0.3.0 validate
+npx @wzrdtech/zap@0.3.0 run agent/skills/zap-world-cup-entrance/Zap.md --json
 
 {
   "mode": "plan",
@@ -33,53 +34,46 @@ npx @wzrdtech/zap@0.2.0 run agent/skills/zap-world-cup-entrance/Zap.md --json
 
 export default async function Page() {
   const zaps = await listZapSpecs();
-  const heroZap = zaps[0];
   const featured = zaps.slice(0, 4);
 
   return (
     <PageShell tone="dark">
-      <section className="zap-metal-field overflow-hidden border-white/10 border-b">
+      <section className="zap-data-field relative overflow-hidden border-white/10 border-b">
+        <Image
+          alt=""
+          className="pointer-events-none absolute right-[-7rem] bottom-[-6rem] hidden h-[36rem] w-[36rem] rotate-[-8deg] object-contain opacity-[0.09] lg:block"
+          height={720}
+          priority
+          src="/zaplogo.png"
+          width={720}
+        />
         <div className="mx-auto grid min-h-[86svh] max-w-7xl content-between px-5 py-5 lg:px-8">
           <SiteNav tone="dark" />
 
-          <div className="grid items-center gap-8 py-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(420px,560px)] lg:py-10">
-            <div className="relative z-10 max-w-3xl">
-              <p className="font-mono text-[12px] tracking-[0.24em] text-zap-cyan uppercase">agent media runtime / v0.2.0</p>
-              <h1 className="mt-5 text-balance font-semibold text-[clamp(4.5rem,16vw,11rem)] leading-[0.78] text-white tracking-normal">
-                Zap
-              </h1>
-              <p className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-white/68">
-                Package one-shot image, video, audio, and stitch workflows as Eve skills that creators can run in one click and agents can audit from files.
-              </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-zap-cyan px-5 font-semibold text-zap-ink transition hover:bg-white" href="/zap/world-cup-entrance">
-                  <Play className="size-4" />
-                  Run demo Zap
-                </Link>
-                <Link className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-white/15 px-5 font-medium text-white transition hover:bg-white/10" href="/quickstart">
-                  <TerminalSquare className="size-4" />
-                  Agent quickstart
-                </Link>
-              </div>
-              <div className="mt-8 max-w-2xl overflow-hidden rounded-md border border-white/10 bg-black/25">
-                <div className="grid grid-cols-3 divide-x divide-white/10">
-                  <Signal label="recipes" value={String(zaps.length)} />
-                  <Signal label="default" value="plan" />
-                  <Signal label="package" value="@wzrdtech/zap" />
-                </div>
-              </div>
+          <div className="relative z-10 max-w-5xl py-10 lg:py-12">
+            <p className="font-mono text-[12px] tracking-[0.24em] text-[#f6ff00] uppercase">agent media runtime / v0.3.0</p>
+            <h1 className="mt-5 text-balance font-semibold text-[clamp(4.5rem,18vw,12rem)] leading-[0.78] text-white tracking-normal">
+              Zap
+            </h1>
+            <p className="mt-6 max-w-3xl text-pretty text-xl leading-8 text-white/72">
+              File-first media recipes for agents, creators, and operators: provider routes, budgets, assets, gallery slugs, and finalization all stay inspectable.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-[#f6ff00] px-5 font-semibold text-[#1a1a1a] transition hover:bg-white" href="/zap/world-cup-entrance">
+                <Play className="size-4" />
+                Run demo Zap
+              </Link>
+              <Link className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-white/15 px-5 font-medium text-white transition hover:bg-white/10" href="/quickstart">
+                <TerminalSquare className="size-4" />
+                Agent quickstart
+              </Link>
             </div>
-
-            <div className="relative">
-              {heroZap ? (
-                <ZapCard
-                  className="mx-auto max-w-[560px]"
-                  primaryHref={`/zap/${heroZap.zap}`}
-                  state="idle"
-                  variant="hero"
-                  zap={heroZap}
-                />
-              ) : null}
+            <div className="mt-10 max-w-3xl overflow-hidden rounded-md border border-white/10 bg-[#1a1a1a]/70">
+              <div className="grid grid-cols-3 divide-x divide-white/10">
+                <Signal label="recipes" value={String(zaps.length)} />
+                <Signal label="default" value="draft + plan" />
+                <Signal label="package" value="@wzrdtech/zap" />
+              </div>
             </div>
           </div>
 
@@ -158,9 +152,9 @@ export default async function Page() {
               {cliProof}
             </CodeWindow>
             <div className="grid gap-3 text-sm sm:grid-cols-3">
-              <Endpoint label="Manifest" value="https://zap.wzrd.tech/api/skills" />
-              <Endpoint label="Core skill" value="https://zap.wzrd.tech/api/skills/zap" />
-              <Endpoint label="Authoring" value="https://zap.wzrd.tech/api/skills/zap-authoring" />
+              <Endpoint label="Manifest" value="https://zap.wzrd-tech.xyz/api/skills" />
+              <Endpoint label="Core skill" value="https://zap.wzrd-tech.xyz/api/skills/zap" />
+              <Endpoint label="Authoring" value="https://zap.wzrd-tech.xyz/api/skills/zap-authoring" />
             </div>
           </div>
         </div>

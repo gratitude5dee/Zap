@@ -28,14 +28,16 @@ export const zapStepKindSchema = z.enum([
   "stitch",
 ]);
 
-export const zapProviderSchema = z.enum(["gmi", "fal", "prodia", "runware"]);
+export const zapProviderSchema = z.enum(["gmi", "fal", "prodia", "runware", "vertex", "aws"]);
 export type ZapProvider = z.infer<typeof zapProviderSchema>;
 
 export const zapStitchSchema = z.object({
   engine: z.enum(["auto", "local", "hyperframes"]).default("auto"),
   fps: z.number().int().min(1).max(120).optional(),
   format: z.enum(["mp4", "webm"]).default("mp4"),
+  inputs: z.record(z.string(), z.unknown()).optional(),
   quality: z.enum(["draft", "standard", "high"]).default("standard"),
+  template: z.string().optional(),
 }).default({ engine: "auto", format: "mp4", quality: "standard" });
 
 export const zapStepSchema = z.object({
@@ -98,6 +100,9 @@ export const zapSpecSchema = z.object({
   publish: zapPublishSchema,
   steps: z.array(zapStepSchema).min(1),
   version: z.literal(2),
+  x_monetization: z.object({
+    cdr: z.boolean().optional(),
+  }).optional(),
   zap: z.string().regex(/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/),
 });
 

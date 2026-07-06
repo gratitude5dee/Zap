@@ -3,11 +3,11 @@ import { CodeWindow, Eyebrow, PageShell, SiteNav } from "@/app/_components/zap-c
 
 const agents = ["Codex", "Claude Code", "Cursor", "OpenClaw", "Hermes"];
 
-const install = `npx @wzrdtech/zap@0.2.0 init my-zap-app
+const install = `npx @wzrdtech/zap@0.3.0 init my-zap-app
 cd my-zap-app
-npx @wzrdtech/zap@0.2.0 new creator-intro
-npx @wzrdtech/zap@0.2.0 validate
-npx @wzrdtech/zap@0.2.0 run agent/skills/zap-creator-intro/Zap.md --json`;
+npx @wzrdtech/zap@0.3.0 new creator-intro
+npx @wzrdtech/zap@0.3.0 validate
+npx @wzrdtech/zap@0.3.0 run agent/skills/zap-creator-intro/Zap.md --json`;
 
 export default function QuickstartPage() {
   return (
@@ -46,10 +46,10 @@ export default function QuickstartPage() {
             </div>
 
             <div className="mt-6 grid gap-3">
-              <Endpoint label="Manifest" value="https://zap.wzrd.tech/api/skills" />
-              <Endpoint label="Core skill" value="https://zap.wzrd.tech/api/skills/zap" />
-              <Endpoint label="Authoring skill" value="https://zap.wzrd.tech/api/skills/zap-authoring" />
-              <Endpoint label="JSON mode" value="https://zap.wzrd.tech/api/skills/zap?format=json" />
+              <Endpoint label="Manifest" value="https://zap.wzrd-tech.xyz/api/skills" />
+              <Endpoint label="Core skill" value="https://zap.wzrd-tech.xyz/api/skills/zap" />
+              <Endpoint label="Authoring skill" value="https://zap.wzrd-tech.xyz/api/skills/zap-authoring" />
+              <Endpoint label="JSON mode" value="https://zap.wzrd-tech.xyz/api/skills/zap?format=json" />
             </div>
           </div>
 

@@ -34,7 +34,7 @@ export default defineSchema({
     assetId: v.optional(v.string()),
     comment: v.optional(v.string()),
     createdAt: v.optional(v.number()),
-    kind: v.union(v.literal("rlhf_vote"), v.literal("judge_score")),
+    kind: v.union(v.literal("rlhf_vote"), v.literal("judge_score"), v.literal("aura_score")),
     rater: v.union(v.literal("heuristic"), v.literal("human"), v.literal("vlm")),
     runId: v.string(),
     scores: v.any(),
@@ -99,13 +99,21 @@ export default defineSchema({
   zaps: defineTable({
     authorId: v.optional(v.string()),
     compiledFromRunId: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+    description: v.optional(v.string()),
     estimateUsd: v.number(),
+    finalizedAt: v.optional(v.number()),
+    finalizedBy: v.optional(v.string()),
+    heroAssetUrl: v.optional(v.string()),
     slug: v.string(),
     source: v.string(),
     status: v.union(v.literal("draft"), v.literal("published")),
     tags: v.array(v.string()),
+    title: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
     version: v.number(),
   })
     .index("by_slug", ["slug"])
+    .index("by_author", ["authorId"])
     .index("by_status", ["status"]),
 });

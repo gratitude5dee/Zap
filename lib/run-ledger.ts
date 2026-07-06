@@ -55,7 +55,7 @@ export type LedgerFeedback = {
   assetId?: string;
   comment?: string;
   createdAt: number;
-  kind: "rlhf_vote" | "judge_score";
+  kind: "rlhf_vote" | "judge_score" | "aura_score";
   rater: "heuristic" | "human" | "vlm";
   runId: string;
   scores: unknown;

@@ -59,7 +59,7 @@ Rules agents must preserve:
 - Every `steps[].id` is unique.
 - Prompt variables like `{PROMPT}` must exist in `inputs`.
 - `budget.estimate_usd` must not exceed `budget.cap_usd`.
-- `provider` must be one of `gmi`, `fal`, `prodia`, or `runware`; `mock` is rejected by schema/runtime.
+- `provider` must be one of `aws`, `fal`, `gmi`, `prodia`, `runware`, or `vertex`; `mock` is rejected by schema/runtime.
 - Live provider runs require explicit `--live` or authenticated web confirmation.
 - Provider-backed steps may define `retry.max`, `retry.backoff_s`,
   `retry.fallback_provider`, and `retry.fallback_model` for bounded repair.
@@ -67,6 +67,6 @@ Rules agents must preserve:
 Validate after every recipe edit:
 
 ```bash
-npx @wzrdtech/zap@0.2.1 validate
-npx @wzrdtech/zap@0.2.1 lint
+npx @wzrdtech/zap@0.3.0 validate
+npx @wzrdtech/zap@0.3.0 lint
 ```

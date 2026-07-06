@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadZapFromSkill } from "@/lib/zap-files";
+import { publicZapOrigin } from "@/lib/zap-urls";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -33,8 +34,6 @@ function extractSlug(rawUrl: string) {
 }
 
 function publicOrigin(request: Request) {
-  const configured = process.env.ZAP_PUBLIC_BASE_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
-  if (configured) return configured.replace(/\/$/, "");
   const url = new URL(request.url);
-  return url.origin;
+  return publicZapOrigin(url.origin);
 }

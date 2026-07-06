@@ -6,7 +6,7 @@ export const add = mutation({
     assetId: v.optional(v.string()),
     comment: v.optional(v.string()),
     createdAt: v.optional(v.number()),
-    kind: v.union(v.literal("rlhf_vote"), v.literal("judge_score")),
+    kind: v.union(v.literal("rlhf_vote"), v.literal("judge_score"), v.literal("aura_score")),
     rater: v.union(v.literal("heuristic"), v.literal("human"), v.literal("vlm")),
     runId: v.string(),
     scores: v.any(),

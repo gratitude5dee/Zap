@@ -1,6 +1,6 @@
 # Web App
 
-The Zap web app is the creator and developer surface deployed at `zap.wzrd.tech`.
+The Zap web app is the creator and developer surface deployed at `zap.wzrd-tech.xyz`.
 
 Primary routes:
 
@@ -16,14 +16,14 @@ Primary routes:
 Auth posture:
 
 - Public docs, gallery, and plan-only demo runs are accessible.
-- Creator live runs and provider secrets require wallet-authenticated Supabase bearer tokens.
+- Creator live runs and provider secrets require wallet-authenticated Supabase bearer tokens or session cookies.
 - Provider webhooks require `ZAP_PROVIDER_WEBHOOK_SECRET` in production; hosted publishing requires `ZAP_PUBLISH_TOKEN`.
-- Poll drain and Eve operational surfaces may still require Basic Auth or their own shared secret.
+- Poll drain uses `ZAP_POLL_DRAIN_SECRET`; Eve accepts Supabase sessions, Vercel OIDC, local dev, or `ZAP_AGENT_TOKEN`.
 
 Smoke production after deploy:
 
 ```bash
-curl -I https://zap.wzrd.tech/
-curl -I https://zap.wzrd.tech/docs
-curl -I https://zap.wzrd.tech/studio
+curl -I https://zap.wzrd-tech.xyz/
+curl -I https://zap.wzrd-tech.xyz/docs
+curl -I https://zap.wzrd-tech.xyz/studio
 ```
