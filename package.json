@@ -1,6 +1,6 @@
 {
   "name": "zap-platform",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Zap: one-click generative content recipes on Eve, Next.js, Convex, Upstash, GMI Cloud, and fal.",
   "type": "module",
@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "next build",
+    "build:packages": "npm run build --workspace @wzrdtech/core && npm run build --workspace @wzrdtech/providers",
     "cli": "node packages/cli/bin/zap.js",
     "dev": "next dev",
     "docs:dev": "npm --prefix docs install --no-audit --no-fund && npm --prefix docs run dev",
@@ -69,6 +70,7 @@
     "@types/react-dom": "19.2.3",
     "@typescript/native-preview": "7.0.0-dev.20260523.1",
     "microsandbox": "^0.5.7",
+    "typescript": "^5.7.2",
     "vitest": "^4.1.0"
   },
   "overrides": {

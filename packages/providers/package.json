@@ -1,12 +1,21 @@
 {
   "name": "@wzrdtech/providers",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "description": "Provider adapters and queue helpers for Zap runtimes.",
   "license": "MIT",
   "type": "module",
+  "types": "./dist/index.d.ts",
   "publishConfig": {
     "access": "public"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/rewrite-dts-imports.mjs dist",
+    "prepack": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -18,20 +27,47 @@
   },
   "homepage": "https://zap.wzrd.tech",
   "exports": {
-    ".": "./src/index.ts",
-    "./errors": "./src/errors.ts",
-    "./fal": "./src/fal.ts",
-    "./gmi": "./src/gmi.ts",
-    "./poll-queue": "./src/poll-queue.ts",
-    "./pricing": "./src/pricing.ts",
-    "./prodia": "./src/prodia.ts",
-    "./registry": "./src/registry.ts",
-    "./runware": "./src/runware.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./fal": {
+      "types": "./dist/fal.d.ts",
+      "import": "./dist/fal.js"
+    },
+    "./gmi": {
+      "types": "./dist/gmi.d.ts",
+      "import": "./dist/gmi.js"
+    },
+    "./poll-queue": {
+      "types": "./dist/poll-queue.d.ts",
+      "import": "./dist/poll-queue.js"
+    },
+    "./pricing": {
+      "types": "./dist/pricing.d.ts",
+      "import": "./dist/pricing.js"
+    },
+    "./prodia": {
+      "types": "./dist/prodia.d.ts",
+      "import": "./dist/prodia.js"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "import": "./dist/registry.js"
+    },
+    "./runware": {
+      "types": "./dist/runware.d.ts",
+      "import": "./dist/runware.js"
+    }
   },
   "dependencies": {
     "@fal-ai/client": "^1.8.0",
     "@upstash/redis": "^1.38.0",
-    "@wzrdtech/core": "0.2.0"
+    "@wzrdtech/core": "0.2.1"
   },
   "engines": {
     "node": "24.x"

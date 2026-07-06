@@ -118,15 +118,15 @@
       "packages/agent": {
         "packageJson": {
           "dependencies": [
-            "npm:@wzrdtech/core@0.2.0"
+            "npm:@wzrdtech/core@0.2.1"
           ]
         }
       },
       "packages/cli": {
         "packageJson": {
           "dependencies": [
-            "npm:@wzrdtech/core@0.2.0",
-            "npm:@wzrdtech/providers@0.2.0",
+            "npm:@wzrdtech/core@0.2.1",
+            "npm:@wzrdtech/providers@0.2.1",
             "npm:convex@^1.28.0",
             "npm:yaml@^2.8.1"
           ]
@@ -145,7 +145,7 @@
           "dependencies": [
             "npm:@fal-ai/client@^1.8.0",
             "npm:@upstash/redis@^1.38.0",
-            "npm:@wzrdtech/core@0.2.0"
+            "npm:@wzrdtech/core@0.2.1"
           ]
         }
       }

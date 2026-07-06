@@ -1,12 +1,21 @@
 {
   "name": "@wzrdtech/core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "description": "Core Zap recipe schema, planning, and registry utilities.",
   "license": "MIT",
   "type": "module",
+  "types": "./dist/index.d.ts",
   "publishConfig": {
     "access": "public"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/rewrite-dts-imports.mjs dist",
+    "prepack": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -18,10 +27,22 @@
   },
   "homepage": "https://zap.wzrd.tech",
   "exports": {
-    ".": "./src/index.ts",
-    "./manifest": "./src/manifest.ts",
-    "./planner": "./src/planner.ts",
-    "./schema": "./src/schema.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest.d.ts",
+      "import": "./dist/manifest.js"
+    },
+    "./planner": {
+      "types": "./dist/planner.d.ts",
+      "import": "./dist/planner.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js"
+    }
   },
   "dependencies": {
     "yaml": "^2.8.1",

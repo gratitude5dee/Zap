@@ -2,7 +2,7 @@
 
 Zap separates recipe planning from provider execution.
 
-Production providers for v0.2.0:
+Production providers for v0.2.1:
 
 - `gmi`: GMI Cloud video generation through the request queue API.
 - `fal`: fal queue-backed image, video, and audio generation.
@@ -15,13 +15,13 @@ Production providers for v0.2.0:
 Provider keys are never required for plan-only runs:
 
 ```bash
-npx @wzrdtech/zap@0.2.0 run world-cup-entrance --json
+npx @wzrdtech/zap@0.2.1 run world-cup-entrance --json
 ```
 
 Live runs require explicit approval:
 
 ```bash
-npx @wzrdtech/zap@0.2.0 run world-cup-entrance --live --input SELFIE=./selfie.png
+npx @wzrdtech/zap@0.2.1 run world-cup-entrance --live --input SELFIE=./selfie.png
 ```
 
 Web live runs require wallet auth and user-owned provider keys stored in Supabase:

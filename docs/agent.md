@@ -25,7 +25,7 @@ creator request
 Agent quickstarts:
 
 ```bash
-npx @wzrdtech/zap@0.2.0 docs agents
+npx @wzrdtech/zap@0.2.1 docs agents
 ```
 
 Remote skill registry:

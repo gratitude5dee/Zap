@@ -9,7 +9,7 @@ import { parseZapMarkdown, validateZapPromptTemplates } from "@wzrdtech/core/sch
 import { defaultModelFor, getProviderAdapter } from "@wzrdtech/providers";
 import { stringify } from "yaml";
 
-const version = "0.2.0";
+const version = "0.2.1";
 const commands = [
   "init",
   "new",
