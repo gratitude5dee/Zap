@@ -32,8 +32,10 @@ NPM release auth:
 
 - Preferred: configure npm trusted publishing for `@wzrdtech/core`, `@wzrdtech/providers`, and `@wzrdtech/zap` with GitHub owner `gratitude5dee`, repository `Zap`, workflow filename `release.yml`, and allowed action `npm publish`.
 - Fallback: add a GitHub Actions secret named `NPM_TOKEN` with package creation and publish access to the `@wzrdtech` scope.
-- First publication of new workspace packages, such as `@wzrdtech/core` and `@wzrdtech/providers`, requires either package-level trusted publisher authorization for those package names or an `NPM_TOKEN` that can create packages in the scope.
+- For npm accounts with 2FA enabled, `NPM_TOKEN` must be a granular token with read/write package access and **Bypass 2FA** enabled; normal login/session tokens authenticate but fail publish with `EOTP`.
+- First publication of new workspace packages, such as `@wzrdtech/core` and `@wzrdtech/providers`, requires either package-level trusted publisher authorization for those package names or an `NPM_TOKEN` that can create packages in the scope and bypass the publish 2FA challenge.
 - The Release workflow uses `NPM_TOKEN` when present; otherwise it leaves `NODE_AUTH_TOKEN` unset so npm can authenticate through OIDC trusted publishing.
+- The Release workflow skips package versions that are already present on npm, so it is safe to rerun after a partial publish.
 
 Deploy sequence:
 

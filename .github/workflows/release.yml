@@ -38,34 +38,44 @@ jobs:
             {
               echo "The following packages do not exist on npm yet: ${missing_packages[*]}."
               echo "First publication requires a GitHub Actions NPM_TOKEN with package creation rights for @wzrdtech."
+              echo "Use a granular npm token with read/write package access and Bypass 2FA enabled."
               echo "After first publish, package-level trusted publishing can publish without a long-lived token."
             } >&2
             exit 1
           fi
+
+          if [ "${#missing_packages[@]}" -gt 0 ]; then
+            {
+              echo "The following packages do not exist on npm yet: ${missing_packages[*]}."
+              echo "The configured NPM_TOKEN must be a granular token with read/write package access and Bypass 2FA enabled."
+              echo "A normal login/session token can authenticate npm but will fail publish with EOTP."
+            } >&2
+          fi
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
-      - name: Publish @wzrdtech/core
+      - name: Publish npm packages
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -n "$NPM_TOKEN" ]; then
             export NODE_AUTH_TOKEN="$NPM_TOKEN"
           fi
-          npm publish --workspace @wzrdtech/core --provenance --access public
-      - name: Publish @wzrdtech/providers
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            export NODE_AUTH_TOKEN="$NPM_TOKEN"
-          fi
-          npm publish --workspace @wzrdtech/providers --provenance --access public
-      - name: Publish @wzrdtech/zap
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            export NODE_AUTH_TOKEN="$NPM_TOKEN"
-          fi
-          npm publish --workspace @wzrdtech/zap --provenance --access public
+
+          publish_workspace() {
+            package_name="$1"
+            package_path="$2"
+            version="$(node -p "require('./${package_path}/package.json').version")"
+
+            if npm view "${package_name}@${version}" version >/dev/null 2>&1; then
+              echo "${package_name}@${version} is already published; skipping."
+              return 0
+            fi
+
+            echo "Publishing ${package_name}@${version}..."
+            npm publish --workspace "$package_name" --provenance --access public
+          }
+
+          publish_workspace @wzrdtech/core packages/core
+          publish_workspace @wzrdtech/providers packages/providers
+          publish_workspace @wzrdtech/zap packages/cli
