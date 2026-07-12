@@ -170,6 +170,9 @@ const sprite = await expectJson(
   200,
   "Sprite draft",
 );
+const spriteDeployment = process.env.ZAP_ACCEPTANCE_DEPLOY_SPRITE === "1"
+  ? await deployAndWaitForSprite(spriteMd)
+  : null;
 const secrets = await expectJson(
   await authenticatedFetch("/api/secrets"),
   200,
@@ -212,7 +215,7 @@ console.log(JSON.stringify({
   },
   principalId: session.principal.principalId,
   secretTypesConfigured: secrets.secrets?.map((secret) => secret.secretType) ?? [],
-  spriteStatus: sprite.status,
+  sprite: spriteDeployment ?? { status: sprite.status },
   validation,
   zap: {
     pageStatus: privateZapPage.status,
@@ -220,6 +223,40 @@ console.log(JSON.stringify({
     visibility: publication.visibility,
   },
 }, null, 2));
+
+async function deployAndWaitForSprite(spriteMd) {
+  const deployment = await expectJson(
+    await authenticatedFetch("/api/studio/sprite/deploy", {
+      body: JSON.stringify({ spriteMd }),
+      method: "POST",
+    }),
+    202,
+    "Sprite deployment",
+  );
+  const timeoutMs = Number(process.env.ZAP_ACCEPTANCE_SPRITE_TIMEOUT_MS ?? 10 * 60 * 1000);
+  const pollMs = Number(process.env.ZAP_ACCEPTANCE_SPRITE_POLL_MS ?? 5_000);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const status = await expectJson(
+      await authenticatedFetch("/api/studio/sprite/status"),
+      200,
+      "Sprite deployment status",
+    );
+    if (status.status === "ready") {
+      return {
+        deploymentId: deployment.deploymentId,
+        deploymentUrl: status.deploymentUrl ?? deployment.deploymentUrl,
+        projectId: deployment.projectId,
+        status: status.status,
+      };
+    }
+    if (status.status === "error") {
+      throw new Error(`Sprite deployment failed: ${errorMessage(status.deploymentError)}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+  throw new Error(`Sprite deployment did not become ready within ${timeoutMs}ms.`);
+}
 
 async function waitForHostedRun(runId) {
   const timeoutMs = Number(process.env.ZAP_ACCEPTANCE_RUN_TIMEOUT_MS ?? 10 * 60 * 1000);
