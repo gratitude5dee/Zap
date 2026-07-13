@@ -5,6 +5,7 @@ import { AlertCircleIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -17,6 +18,7 @@ import {
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
 import { Spinner } from "@/components/ui/spinner";
+import { extractLatestSavedZapDraft, STUDIO_ZAP_DRAFT_EVENT } from "@/lib/studio-authoring";
 import { cn } from "@/lib/utils";
 import { ZAP_DOCS_URL } from "@/lib/zap-urls";
 import { AgentMessage, messageHasVisibleContent } from "./agent-message";
@@ -34,6 +36,7 @@ const SPRING = { type: "spring", stiffness: 320, damping: 32 } as const;
 
 export function AgentChat({ className }: { readonly className?: string } = {}) {
   const agent = useEveAgent();
+  const openedDraftCalls = useRef(new Set<string>());
   const isBusy = agent.status === "submitted" || agent.status === "streaming";
   const isEmpty = agent.data.messages.length === 0;
 
@@ -45,6 +48,13 @@ export function AgentChat({ className }: { readonly className?: string } = {}) {
     (lastMessage === undefined ||
       lastMessage.role !== "assistant" ||
       !messageHasVisibleContent(lastMessage));
+
+  useEffect(() => {
+    const draft = extractLatestSavedZapDraft(agent.data.messages);
+    if (!draft || openedDraftCalls.current.has(draft.toolCallId)) return;
+    openedDraftCalls.current.add(draft.toolCallId);
+    window.dispatchEvent(new CustomEvent(STUDIO_ZAP_DRAFT_EVENT, { detail: draft }));
+  }, [agent.data.messages]);
 
   const submitText = async (text: string) => {
     const trimmed = text.trim();

@@ -7,11 +7,17 @@ export interface ReplayStore {
 }
 
 export class MemoryReplayStore implements ReplayStore {
-  readonly #events = new Set<string>();
+  readonly #events = new Map<string, number>();
 
-  async claim(eventId: string) {
+  constructor(private readonly now: () => number = Date.now) {}
+
+  async claim(eventId: string, expiresAtMs: number) {
+    const now = this.now();
+    for (const [id, expiresAt] of this.#events) {
+      if (expiresAt <= now) this.#events.delete(id);
+    }
     if (this.#events.has(eventId)) return false;
-    this.#events.add(eventId);
+    this.#events.set(eventId, expiresAtMs);
     return true;
   }
 }

@@ -35,7 +35,7 @@ export type ZapCardRun = {
 export type ZapCardState = "idle" | "running" | "done" | "error";
 
 type AuraScoreResponse = {
-  readonly mode: "gateway" | "heuristic";
+  readonly mode: "gateway" | "openai" | "anthropic" | "openrouter" | "heuristic";
   readonly model?: string;
   readonly overall: number;
   readonly rationale?: string;

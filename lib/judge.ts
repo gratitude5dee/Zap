@@ -4,7 +4,7 @@ import { z } from "zod";
 import { addFeedbackLedger, getAssetSnapshot, type LedgerFeedback } from "./run-ledger";
 import { ZapRunError } from "./zap-errors";
 import type { ZapStep } from "./zap-schema";
-import { createLlmModel, resolveLlmRoute } from "./llm-route";
+import { createLlmModel, resolveLlmPurposeRoute, type LlmRoute, type LlmRouteSelection } from "./llm-route";
 
 export type JudgeAssetInput = {
   assetId: string;
@@ -18,7 +18,7 @@ export type JudgeAssetInput = {
 export type JudgeAssetResult = {
   assetId: string;
   feedbackId: string;
-  mode: "gateway" | "heuristic";
+  mode: LlmRoute | "heuristic";
   model?: string;
   overall: number;
   passed: boolean;
@@ -39,7 +39,7 @@ export type AuraScoreInput = {
 export type AuraScoreResult = {
   assetId?: string;
   feedbackId: string;
-  mode: "gateway" | "heuristic";
+  mode: LlmRoute | "heuristic";
   model?: string;
   overall: number;
   rationale?: string;
@@ -75,7 +75,7 @@ export async function judgeAsset(input: JudgeAssetInput): Promise<JudgeAssetResu
       ? `Judge passed at ${overall.toFixed(2)}.`
       : `Judge failed at ${overall.toFixed(2)}; threshold is ${threshold.toFixed(2)}.`,
     kind: "judge_score",
-    rater: judged.mode === "gateway" ? "vlm" : "heuristic",
+    rater: judged.mode === "heuristic" ? "heuristic" : "vlm",
     runId: input.runId,
     scores: {
       criteria,
@@ -153,7 +153,7 @@ export async function scoreAuraVideo(input: AuraScoreInput): Promise<AuraScoreRe
     assetId: input.assetId,
     comment: `Aura ${verdict} at ${overall.toFixed(2)}.`,
     kind: "aura_score",
-    rater: scored.mode === "gateway" ? "vlm" : "heuristic",
+    rater: scored.mode === "heuristic" ? "heuristic" : "vlm",
     runId: input.runId,
     scores: {
       criteria: auraCriteria,
@@ -228,23 +228,23 @@ function scoreCriterion({
 
 async function scoreAsset(input: JudgeAssetInput & { assetUrl: string; criteria: string[] }): Promise<{
   gatewayError?: string;
-  mode: "gateway" | "heuristic";
+  mode: LlmRoute | "heuristic";
   model?: string;
   overall?: number;
   rationale?: string;
   scores: Record<string, number>;
 }> {
-  const selection = resolveLlmRoute(process.env, process.env.ZAP_JUDGE_MODEL ?? "google/gemini-2.5-flash");
+  const selection = resolveLlmPurposeRoute("judge");
   if (shouldUseLlmJudge(input.assetUrl, selection.route)) {
     try {
       const judged = await scoreWithLlm(input, selection);
-      return { ...judged, mode: "gateway", model: selection.modelId };
+      return { ...judged, mode: selection.route, model: selection.modelId };
     } catch (error) {
       const heuristic = scoreWithHeuristic(input);
       return {
         ...heuristic,
-        gatewayError: error instanceof Error ? error.message : "Gateway judge failed.",
-        rationale: "AI Gateway judge unavailable; deterministic heuristic fallback used.",
+        gatewayError: error instanceof Error ? error.message : "LLM judge failed.",
+        rationale: `${selection.route} judge unavailable; deterministic heuristic fallback used.`,
       };
     }
   }
@@ -253,24 +253,24 @@ async function scoreAsset(input: JudgeAssetInput & { assetUrl: string; criteria:
 
 async function scoreAuraAsset(input: JudgeAssetInput & { assetUrl: string; criteria: string[] }): Promise<{
   gatewayError?: string;
-  mode: "gateway" | "heuristic";
+  mode: LlmRoute | "heuristic";
   model?: string;
   overall?: number;
   rationale?: string;
   scores: Record<string, number>;
   verdict?: "rerun" | "review" | "ship";
 }> {
-  const selection = resolveLlmRoute(process.env, process.env.ZAP_AURA_MODEL ?? "google/gemini-3.5-flash");
+  const selection = resolveLlmPurposeRoute("aura");
   if (shouldUseLlmJudge(input.assetUrl, selection.route)) {
     try {
       const scored = await scoreAuraWithLlm(input, selection);
-      return { ...scored, mode: "gateway", model: selection.modelId };
+      return { ...scored, mode: selection.route, model: selection.modelId };
     } catch (error) {
       const heuristic = scoreWithHeuristic(input);
       return {
         ...heuristic,
-        gatewayError: error instanceof Error ? error.message : "Aura gateway failed.",
-        rationale: "AI Gateway Aura scorer unavailable; deterministic heuristic fallback used.",
+        gatewayError: error instanceof Error ? error.message : "Aura LLM scorer failed.",
+        rationale: `${selection.route} Aura scorer unavailable; deterministic heuristic fallback used.`,
       };
     }
   }
@@ -279,7 +279,7 @@ async function scoreAuraAsset(input: JudgeAssetInput & { assetUrl: string; crite
 
 async function scoreAuraWithLlm(
   input: JudgeAssetInput & { assetUrl: string; criteria: string[] },
-  selection: ReturnType<typeof resolveLlmRoute>,
+  selection: LlmRouteSelection,
 ) {
   const schema = z.object({
     overall: z.number().min(0).max(1).optional(),
@@ -322,7 +322,7 @@ async function scoreAuraWithLlm(
 
 async function scoreWithLlm(
   input: JudgeAssetInput & { assetUrl: string; criteria: string[] },
-  selection: ReturnType<typeof resolveLlmRoute>,
+  selection: LlmRouteSelection,
 ) {
   const schema = z.object({
     overall: z.number().min(0).max(1).optional(),
@@ -380,7 +380,7 @@ function normalizeScores(scores: Record<string, number>, criteria: string[], inp
   }));
 }
 
-function shouldUseLlmJudge(assetUrl: string, route: ReturnType<typeof resolveLlmRoute>["route"]) {
+function shouldUseLlmJudge(assetUrl: string, route: LlmRoute) {
   const configured = route === "gateway"
     ? process.env.AI_GATEWAY_API_KEY
     : route === "openai"

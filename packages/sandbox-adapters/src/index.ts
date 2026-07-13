@@ -5,8 +5,21 @@ import { vercel } from "eve/sandbox/vercel";
 import { daytonaBackend } from "./daytona";
 import { e2bBackend } from "./e2b";
 import { resolveManagedSandboxCredential } from "./managed-secrets";
+import {
+  resolveBoxSandboxOptions,
+  resolveDaytonaSandboxOptions,
+  resolveSandboxResources,
+  resolveVercelSandboxOptions,
+} from "./resources";
 
 export { resolveManagedSandboxCredential } from "./managed-secrets";
+export {
+  resolveBoxSandboxOptions,
+  resolveDaytonaSandboxOptions,
+  resolveE2BSandboxOptions,
+  resolveSandboxResources,
+  resolveVercelSandboxOptions,
+} from "./resources";
 
 export const ZAP_SANDBOX_BACKENDS = ["vercel", "box", "daytona", "e2b", "docker", "auto"] as const;
 export type ZapSandboxBackendName = (typeof ZAP_SANDBOX_BACKENDS)[number];
@@ -25,20 +38,34 @@ export function resolveSandboxBackend<T extends { name: string } = SandboxBacken
   if (!isBackendName(selected)) {
     throw new Error(`ZAP_SANDBOX_BACKEND must be one of ${ZAP_SANDBOX_BACKENDS.join(", ")}; received ${selected}.`);
   }
+  const resources = resolveSandboxResources(env);
   const defaults = {
     auto: () => defaultBackend(),
     box: () => lazyBackend("ascii-box", async () => {
       const apiKey = env.BOX_API_KEY?.trim()
         || await resolveManagedSandboxCredential("box", "box_api_key", env);
-      const { asciiBox } = await import("@asciidev/eve-box") as unknown as {
-        asciiBox(options: { apiKey?: string; noEnv: boolean }): SandboxBackend;
-      };
-      return withBoxLifecycleCompatibility(asciiBox({ apiKey, noEnv: true }), apiKey);
+      const { asciiBox } = await import("@asciidev/eve-box");
+      const box = resolveBoxSandboxOptions(resources);
+      return withBoxLifecycleCompatibility(asciiBox({
+        apiKey,
+        noEnv: true,
+        ...box,
+      }), apiKey);
     }),
-    daytona: () => lazyBackend("daytona", () => daytonaBackend({ apiKey: env.DAYTONA_API_KEY })),
+    daytona: () => lazyBackend("daytona", () => {
+      const daytona = resolveDaytonaSandboxOptions(resources);
+      return daytonaBackend({
+        apiKey: env.DAYTONA_API_KEY,
+        resources: daytona.resources,
+        timeoutSeconds: resources.timeoutSeconds,
+      });
+    }),
     docker: () => docker(),
-    e2b: () => lazyBackend("e2b", () => e2bBackend({ apiKey: env.E2B_API_KEY })),
-    vercel: () => vercel(),
+    e2b: () => lazyBackend("e2b", () => e2bBackend({
+      apiKey: env.E2B_API_KEY,
+      resources,
+    })),
+    vercel: () => vercel(resolveVercelSandboxOptions(resources)),
   } as Factories<SandboxBackend>;
   return (factories ?? defaults as unknown as Factories<T>)[selected]();
 }

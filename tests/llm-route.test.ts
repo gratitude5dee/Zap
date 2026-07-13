@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createLlmModel,
+  defaultLlmModelForRoute,
   resolveLlmRoute,
+  resolveLlmPurposeRoute,
   type LlmRoute,
   type LlmRouteSelection,
 } from "../lib/llm-route";
@@ -38,6 +40,32 @@ describe("LLM routing", () => {
       modelId: "judge/model",
       route: "gateway",
     });
+  });
+
+  it.each([
+    ["judge", "gateway", "google/gemini-2.5-flash"],
+    ["judge", "openai", "gpt-5.4"],
+    ["judge", "anthropic", "claude-sonnet-4-6"],
+    ["judge", "openrouter", "google/gemini-2.5-flash"],
+    ["aura", "gateway", "google/gemini-3.5-flash"],
+    ["aura", "openai", "gpt-5.4"],
+    ["aura", "anthropic", "claude-sonnet-4-6"],
+    ["aura", "openrouter", "google/gemini-3.5-flash"],
+  ] satisfies Array<["judge" | "aura", LlmRoute, string]>) (
+    "uses a route-compatible %s model for %s",
+    (purpose, route, modelId) => {
+      expect(resolveLlmPurposeRoute(purpose, {
+        ZAP_AURA_MODEL: "google/gemini-3.5-flash",
+        ZAP_JUDGE_MODEL: "google/gemini-2.5-flash",
+        ZAP_LLM_ROUTE: route,
+      })).toEqual({ modelId, route });
+    },
+  );
+
+  it("changes a Sprite's default model when its route changes", () => {
+    expect(defaultLlmModelForRoute("gateway")).toBe("anthropic/claude-sonnet-4.6");
+    expect(defaultLlmModelForRoute("openai")).toBe("gpt-5.4");
+    expect(defaultLlmModelForRoute("anthropic")).toBe("claude-sonnet-4-6");
   });
 
   it("rejects an unsupported route with the accepted values", () => {
@@ -82,4 +110,12 @@ describe("LLM routing", () => {
       });
     },
   );
+
+  it("loads the real direct Anthropic factory without a computed runtime import", async () => {
+    const model = await createLlmModel(
+      { modelId: "claude-sonnet-4-6", route: "anthropic" },
+      { env: { ANTHROPIC_API_KEY: "test-key" } },
+    );
+    expect(model).toMatchObject({ modelId: "claude-sonnet-4-6", provider: "anthropic.messages" });
+  });
 });

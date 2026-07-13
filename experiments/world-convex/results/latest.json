@@ -1,0 +1,168 @@
+{
+  "environment": {
+    "arch": "arm64",
+    "node": "v24.14.0",
+    "platform": "darwin"
+  },
+  "generatedAt": "2026-07-13T05:09:41.610Z",
+  "mode": "convex",
+  "productionDefault": "vercel",
+  "schemaVersion": 1,
+  "versions": {
+    "adamEve": "0.22.0",
+    "zapEve": "0.22.4",
+    "zapPlatform": "0.3.0"
+  },
+  "artifacts": {
+    "upstreamFixtureAvailable": true,
+    "vercelBundleAvailable": true,
+    "worldConvexBundleAvailable": true
+  },
+  "benchmarks": {
+    "measurement": "fresh Node process + dynamic import; lower-bound proxy only",
+    "vercel": {
+      "available": true,
+      "bundle": {
+        "sha256": "222337b4cc24072f23c0f8cefa7a86b69de6c2f088c79172e6554f2ef0da6919",
+        "sizeBytes": 3463434
+      },
+      "errors": [],
+      "importMs": [
+        116.34,
+        94.63,
+        100.03,
+        98.29,
+        100.78,
+        97.25,
+        95.96,
+        95.52,
+        98.31
+      ],
+      "processWallMs": [
+        139.82,
+        114.75,
+        120.01,
+        118.99,
+        121.94,
+        118.17,
+        116.47,
+        116.19,
+        119
+      ],
+      "summary": {
+        "importP50Ms": 98.29,
+        "importP95Ms": 116.34,
+        "processWallP50Ms": 118.99,
+        "processWallP95Ms": 139.82,
+        "samples": 9
+      }
+    },
+    "worldConvex": {
+      "available": true,
+      "bundle": {
+        "sha256": "db82fb3b5f91c84cca11b3b38e759077fb1f91a9141cc138fdb826d41e2ae729",
+        "sizeBytes": 5114567
+      },
+      "errors": [],
+      "importMs": [
+        150.11,
+        149.91,
+        146.61,
+        141.59,
+        143.2,
+        142.87,
+        143.38,
+        141.68,
+        141.05
+      ],
+      "processWallMs": [
+        172.3,
+        173.89,
+        169.1,
+        162.97,
+        164.52,
+        164.56,
+        164.69,
+        162.75,
+        162.22
+      ],
+      "summary": {
+        "importP50Ms": 143.2,
+        "importP95Ms": 150.11,
+        "processWallP50Ms": 164.56,
+        "processWallP95Ms": 173.89,
+        "samples": 9
+      }
+    }
+  },
+  "inspection": {
+    "evidence": {
+      "agentConfig": "apps/agent/agent/agent.ts",
+      "convexHttp": "packages/backend/convex/http.ts",
+      "loader": "packages/backend/convex/runner/bundle.ts",
+      "runRail": "app/studio/run-rail.tsx",
+      "runner": "packages/backend/convex/runner/engine.ts",
+      "ui": "packages/backend/convex/ui.ts",
+      "worldPackage": "packages/world-convex/package.json",
+      "zapWebhooks": "agent/channels/public-surfaces.ts"
+    },
+    "checks": {
+      "bundleInstallsWorld": true,
+      "convexHasProviderWebhookBridge": false,
+      "convexHasReactiveStreamQuery": true,
+      "eveSelectsWorld": true,
+      "inProcessNodeRunner": true,
+      "usesLocalDynamicBundlePath": true,
+      "vendoredBundlePresent": true,
+      "worldPackagePresent": true,
+      "zapHasProviderWebhookSurface": true,
+      "zapRailConsumesWorldStream": false
+    }
+  },
+  "result": {
+    "blockingCriteria": [
+      "cloudBundle",
+      "coldStart",
+      "providerWebhooks",
+      "streamTailing"
+    ],
+    "criteria": {
+      "cloudBundle": {
+        "detail": "The Convex action dynamically imports EVE_BUNDLE_PATH; that checkout path is unavailable in Convex Cloud.",
+        "evidence": {},
+        "status": "fail"
+      },
+      "coldStart": {
+        "detail": "Fresh-process bundle import is a lower-bound proxy, not a deployed Convex action cold start.",
+        "evidence": {
+          "p95Ratio": 1.244,
+          "vercelProcessWallP95Ms": 139.82,
+          "worldConvexProcessWallP95Ms": 173.89
+        },
+        "status": "proxy-fail"
+      },
+      "providerWebhooks": {
+        "detail": "Zap declares provider callbacks, but the Convex HTTP router does not expose a callback bridge.",
+        "evidence": {},
+        "status": "fail"
+      },
+      "streamTailing": {
+        "detail": "Adam exposes a reactive world-stream query, but Zap's run rail does not consume that stream.",
+        "evidence": {},
+        "status": "fail"
+      },
+      "wiring": {
+        "detail": "The upstream fixture must select world-convex, vendor it into Eve, and invoke the workflow handler from a Convex Node action.",
+        "evidence": {
+          "bundleInstallsWorld": true,
+          "eveSelectsWorld": true,
+          "inProcessNodeRunner": true,
+          "worldPackagePresent": true
+        },
+        "status": "pass"
+      }
+    },
+    "decision": "NO-GO"
+  },
+  "decision": "NO-GO"
+}

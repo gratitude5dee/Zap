@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   CHANNEL_REQUIRED_ENV,
   CHANNEL_WEBHOOK_PATHS,
+  assertChannelEnvironment,
+  missingChannelEnvironment,
+  redeemDirectChannelLinkCommand,
   imessagePrincipalFromEvent,
   parseImessageBridgeEvent,
   resolveChannelSessionAuth,
@@ -22,16 +25,53 @@ describe("chat channel contracts", () => {
       telegram: "/eve/v1/telegram",
     });
     expect(CHANNEL_REQUIRED_ENV.slack).toEqual([
+      "CHANNEL_LINK_SECRET",
       "REDIS_URL",
       "SLACK_BOT_TOKEN",
       "SLACK_SIGNING_SECRET",
+      "UPSTASH_REDIS_REST_TOKEN",
+      "UPSTASH_REDIS_REST_URL",
     ]);
     expect(CHANNEL_REQUIRED_ENV.telegram).toEqual([
+      "CHANNEL_LINK_SECRET",
       "REDIS_URL",
       "TELEGRAM_BOT_TOKEN",
       "TELEGRAM_WEBHOOK_SECRET_TOKEN",
       "TELEGRAM_TENANT_ID",
+      "UPSTASH_REDIS_REST_TOKEN",
+      "UPSTASH_REDIS_REST_URL",
     ]);
+    expect(CHANNEL_REQUIRED_ENV.imessage).toEqual([
+      "CHANNEL_LINK_SECRET",
+      "IMESSAGE_BRIDGE_TOKEN",
+      "IMESSAGE_BRIDGE_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+      "UPSTASH_REDIS_REST_URL",
+    ]);
+  });
+
+  it("reports every missing selected-channel credential once and fails before deployment", () => {
+    const env = {
+      CHANNEL_LINK_SECRET: "link-secret",
+      SLACK_BOT_TOKEN: "xoxb-test",
+      UPSTASH_REDIS_REST_TOKEN: "redis-token",
+    };
+
+    expect(missingChannelEnvironment(["slack", "imessage"], env)).toEqual([
+      "IMESSAGE_BRIDGE_TOKEN",
+      "IMESSAGE_BRIDGE_URL",
+      "REDIS_URL",
+      "SLACK_SIGNING_SECRET",
+      "UPSTASH_REDIS_REST_URL",
+    ]);
+    expect(() => assertChannelEnvironment(["slack", "imessage"], env)).toThrow(
+      /Selected Sprite channels are not configured.*IMESSAGE_BRIDGE_TOKEN.*UPSTASH_REDIS_REST_URL/,
+    );
+  });
+
+  it("accepts an empty channel list without requiring optional integrations", () => {
+    expect(missingChannelEnvironment([], {})).toEqual([]);
+    expect(() => assertChannelEnvironment([], {})).not.toThrow();
   });
 
   it("maps Slack and Telegram users with an adapter-scoped tenant", () => {
@@ -50,9 +90,10 @@ describe("chat channel contracts", () => {
     const principal = { adapter: "slack", tenantId: "T123", userId: "U123" };
     const store = new FakeLinkStore();
 
-    await expect(resolveChannelSessionAuth(principal, store)).resolves.toEqual({
+    await expect(resolveChannelSessionAuth(principal, store, { isDirectMessage: true })).resolves.toEqual({
       attributes: {
         channelAdapter: "slack",
+        channelIsDirectMessage: "true",
         channelPrincipalKey: JSON.stringify(["slack", "T123", "U123"]),
         channelTenantId: "T123",
         channelUserId: "U123",
@@ -68,9 +109,10 @@ describe("chat channel contracts", () => {
       walletPrincipalId: "wallet:0x1111111111111111111111111111111111111111",
       walletUserId: "wallet-user-1",
     };
-    await expect(resolveChannelSessionAuth(principal, store)).resolves.toEqual({
+    await expect(resolveChannelSessionAuth(principal, store, { isDirectMessage: true })).resolves.toEqual({
       attributes: {
         channelAdapter: "slack",
+        channelIsDirectMessage: "true",
         channelPrincipalKey: JSON.stringify(["slack", "T123", "U123"]),
         channelTenantId: "T123",
         channelUserId: "U123",
@@ -80,6 +122,17 @@ describe("chat channel contracts", () => {
       authenticator: "channel-link",
       principalId: "wallet:0x1111111111111111111111111111111111111111",
       principalType: "user",
+    });
+  });
+
+  it("refuses to redeem a visible wallet link code outside a direct message", async () => {
+    await expect(redeemDirectChannelLinkCommand({
+      isDirectMessage: false,
+      principal: { adapter: "slack", tenantId: "T123", userId: "U123" },
+      text: "/link 0011-2233-4455-6677",
+    })).resolves.toEqual({
+      linked: false,
+      message: "For your security, wallet link codes can only be redeemed in a direct message with Zap.",
     });
   });
 

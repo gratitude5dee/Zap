@@ -24,6 +24,10 @@ Vercel app env:
 - `ZAP_SANDBOX_BACKEND=box` (Box is the default even when omitted)
 - `BOX_API_KEY`, unless the key is stored in the Supabase managed-secret bridge
 
+Selected Sprite channels are validated before Vercel project creation. Add the complete channel set described in `docs/channels.md`: `CHANNEL_LINK_SECRET` and the Upstash REST pair for every channel; `REDIS_URL` plus provider tokens for Slack/Telegram; and the bridge URL/token for iMessage. Do not select a channel in a Sprite until its webhook has been registered at the production `/eve/v1/<channel>` URL.
+
+Sprite project creation also requires a least-privilege Vercel integration/access token in `SPRITE_VERCEL_TOKEN`, its team id, and the configured GitHub repository id/name. `SPRITE_PLUGIN_CATALOG_JSON` is a server-only allowlist that maps wizard plugin ids to approved MCP endpoints; arbitrary package names are never installed.
+
 Supabase Edge Function secrets:
 
 - `USER_SECRETS_ENCRYPTION_KEY`
@@ -51,6 +55,7 @@ Deploy sequence:
 ```bash
 npm test
 npm run typecheck
+npm run test:channels
 npm run build
 gh workflow run Release --repo gratitude5dee/Zap --ref main -f publish=true
 vercel deploy --prod --yes

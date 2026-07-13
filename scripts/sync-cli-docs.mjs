@@ -9,7 +9,7 @@ copyMarkdownTree(sourceRoot, targetRoot);
 
 function copyMarkdownTree(source, target) {
   for (const entry of readdirSync(source, { withFileTypes: true })) {
-    if (entry.name === "node_modules") continue;
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
     const sourcePath = path.join(source, entry.name);
     const targetPath = path.join(target, entry.name);
     if (entry.isDirectory()) {

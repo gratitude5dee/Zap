@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 const outputRoot = resolve(process.argv[2] ?? ".output/server");
 const requiredPackages = [
+  "@ai-sdk/anthropic",
   "@asciidev/eve-box",
   "@daytonaio/sdk",
   "e2b",
@@ -19,8 +20,8 @@ for (const packageName of requiredPackages) {
 
 if (missing.length > 0) {
   throw new Error(
-    `Eve runtime output ${outputRoot} is missing traced sandbox dependencies: ${missing.join(", ")}`,
+    `Eve runtime output ${outputRoot} is missing traced runtime dependencies: ${missing.join(", ")}`,
   );
 }
 
-console.log(`Verified ${requiredPackages.length} sandbox runtime dependencies in ${outputRoot}.`);
+console.log(`Verified ${requiredPackages.length} runtime dependencies in ${outputRoot}.`);

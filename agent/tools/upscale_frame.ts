@@ -1,6 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { submitGeneration } from "../../lib/providers/router.js";
+import { assertPaidToolSession } from "../../lib/channel-run-context.js";
 
 export default defineTool({
   description: "Upscale a frame for ExtendGen conditioning.",
@@ -11,7 +12,9 @@ export default defineTool({
     runId: z.string(),
     stepId: z.string(),
   }),
-  async execute(input) {
+  approval: () => "user-approval",
+  async execute(input, ctx) {
+    assertPaidToolSession(ctx.session.auth);
     return submitGeneration({
       capability: "video.upscale",
       inputs: { imageUrl: input.imageUrl },

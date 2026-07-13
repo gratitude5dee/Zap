@@ -27,7 +27,7 @@ export function SpriteWizard() {
   const [message, setMessage] = useState("");
   const [slug, setSlug] = useState("my-world-cup-sprite");
   const [description, setDescription] = useState("My deployable World Cup media runtime.");
-  const [sandbox, setSandbox] = useState<SpriteSpec["sandbox"]>("vercel-standard");
+  const [sandbox, setSandbox] = useState<SpriteSpec["sandbox"]>("box-standard");
   const [route, setRoute] = useState<SpriteSpec["model"]["route"]>("gateway");
   const [modelId, setModelId] = useState("anthropic/claude-sonnet-4.6");
   const [mcpId, setMcpId] = useState("");
@@ -166,9 +166,9 @@ export function SpriteWizard() {
   function renderStep(name: (typeof SPRITE_WIZARD_STEPS)[number]) {
     switch (name) {
       case "sandbox":
-        return <NativeSelect onChange={(value) => setSandbox(value as SpriteSpec["sandbox"])} options={["vercel-standard", "box-standard", "daytona-standard", "e2b-standard", "docker-local"]} value={sandbox} />;
+        return <NativeSelect onChange={(value) => setSandbox(value as SpriteSpec["sandbox"])} options={["box-standard", "vercel-standard", "daytona-standard", "e2b-standard", "docker-local"]} value={sandbox} />;
       case "model":
-        return <div className="grid gap-3 sm:grid-cols-2"><NativeSelect onChange={(value) => setRoute(value as SpriteSpec["model"]["route"])} options={["gateway", "openai", "anthropic", "openrouter"]} value={route} /><Input onChange={(event) => setModelId(event.target.value)} value={modelId} /></div>;
+        return <div className="grid gap-3 sm:grid-cols-2"><NativeSelect onChange={(value) => { const nextRoute = value as SpriteSpec["model"]["route"]; setRoute(nextRoute); setModelId(spriteModelDefaults[nextRoute]); }} options={["gateway", "openai", "anthropic", "openrouter"]} value={route} /><Input onChange={(event) => setModelId(event.target.value)} value={modelId} /></div>;
       case "connections":
         return <div className="grid gap-3"><Input onChange={(event) => setMcpId(event.target.value)} placeholder="MCP id (optional)" value={mcpId} /><Input onChange={(event) => setMcpUrl(event.target.value)} placeholder="https://…/mcp" type="url" value={mcpUrl} /><Input onChange={(event) => setPlugins(event.target.value)} placeholder="plugin ids, comma separated" value={plugins} /></div>;
       case "connectors":
@@ -180,6 +180,13 @@ export function SpriteWizard() {
     }
   }
 }
+
+const spriteModelDefaults: Record<SpriteSpec["model"]["route"], string> = {
+  anthropic: "claude-sonnet-4-6",
+  gateway: "anthropic/claude-sonnet-4.6",
+  openai: "gpt-5.4",
+  openrouter: "anthropic/claude-sonnet-4.6",
+};
 
 function NativeSelect({ onChange, options, value }: { onChange(value: string): void; options: string[]; value: string }) {
   return <select className="h-10 rounded-md border border-white/15 bg-black/30 px-3 text-sm text-white" onChange={(event) => onChange(event.target.value)} value={value}>{options.map((option) => <option key={option}>{option}</option>)}</select>;

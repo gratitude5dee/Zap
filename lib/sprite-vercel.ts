@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { Vercel } from "@vercel/sdk";
 import type { SpriteSpec } from "@wzrdtech/core";
 import type { SpriteComposioSession } from "./sprite-composio";
+import { assertChannelEnvironment } from "./channel-runtime";
 import { spriteEnvironment } from "./sprite-environment";
 import type { SpriteRecord } from "./sprite-store";
 
@@ -21,6 +22,7 @@ export async function deploySpriteToVercel(input: {
   manifest: string;
   spec: SpriteSpec;
 }): Promise<SpriteDeployment> {
+  assertChannelEnvironment(input.spec.channels);
   const config = deploymentConfig();
   const vercel = new Vercel({ bearerToken: config.token });
   const projectName = input.existing?.projectName ?? spriteProjectName(input.authorId);

@@ -2,6 +2,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { NextResponse } from "next/server";
 import { convexServiceToken } from "@/lib/convex-service";
+import { projectStudioRunRows } from "@/lib/studio-runs";
 import { getRequestAccessToken, resolveWalletPrincipal } from "@/lib/supabase/server";
 
 const listRecentRuns = makeFunctionReference<"query">("runs:listRecent");
@@ -17,29 +18,9 @@ export async function GET(request: Request) {
     limit: 8,
     principalId: principal.principalId,
     serviceToken: convexServiceToken(),
-  }) as Array<any>;
+  }) as unknown[];
 
   return NextResponse.json({
-    runs: rows.map((entry) => ({
-      assets: entry.assets.map((asset: any) => ({ _id: asset._id, kind: asset.kind, stepId: asset.stepId })),
-      feedback: entry.feedback.map((feedback: any) => ({
-        kind: feedback.kind,
-        scores: feedback.scores,
-        stepId: feedback.stepId,
-      })),
-      run: {
-        costUsd: entry.run.costUsd,
-        runId: entry.run.runId,
-        stage: entry.run.stage,
-        status: entry.run.status,
-        zapSlug: entry.run.zapSlug,
-        zapUrl: entry.run.zapUrl,
-      },
-      steps: entry.steps.map((step: any) => ({
-        progress: step.progress,
-        status: step.status,
-        stepId: step.stepId,
-      })),
-    })),
+    runs: projectStudioRunRows(rows),
   }, { headers: { "cache-control": "no-store" } });
 }

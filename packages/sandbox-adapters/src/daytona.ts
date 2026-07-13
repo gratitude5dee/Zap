@@ -1,11 +1,28 @@
 import type { SandboxBackend } from "eve/sandbox";
+import type { Sandbox as DaytonaSandbox } from "@daytonaio/sdk";
 import { createVendorBackend } from "./backend";
+import {
+  resolveDaytonaSandboxOptions,
+  resolveSandboxResources,
+  type SandboxResources,
+} from "./resources";
 import type { SandboxDriver } from "./session";
 
-export async function daytonaBackend(options: { apiKey?: string } = {}): Promise<SandboxBackend> {
+export async function daytonaBackend(options: {
+  apiKey?: string;
+  resources?: ReturnType<typeof resolveDaytonaSandboxOptions>["resources"];
+  timeoutSeconds?: SandboxResources["timeoutSeconds"];
+} = {}): Promise<SandboxBackend> {
   const apiKey = options.apiKey ?? process.env.DAYTONA_API_KEY;
   if (!apiKey) throw new Error("DAYTONA_API_KEY is required when ZAP_SANDBOX_BACKEND=daytona.");
-  const { Daytona: DaytonaClient } = await import("@daytonaio/sdk") as unknown as DaytonaModule;
+  const defaultResources = resolveSandboxResources();
+  const defaults = resolveDaytonaSandboxOptions(defaultResources);
+  const resources = options.resources ?? defaults.resources;
+  const autoStopInterval = Math.max(
+    1,
+    Math.ceil((options.timeoutSeconds ?? defaultResources.timeoutSeconds) / 60),
+  );
+  const { Daytona: DaytonaClient } = await import("@daytonaio/sdk");
   const client = new DaytonaClient({ apiKey });
   return createVendorBackend({
     name: "daytona",
@@ -13,11 +30,12 @@ export async function daytonaBackend(options: { apiKey?: string } = {}): Promise
     async prewarmDriver(name) {
       const sandbox = await client.create({
         autoArchiveInterval: 60,
-        autoStopInterval: 15,
+        autoStopInterval,
         labels: { runtime: "eve", template: name },
         language: "typescript",
         name: `${name}-prewarm`,
       });
+      await enforceDaytonaResources(sandbox, resources);
       return daytonaDriver(sandbox, async () => {
         await sandbox._experimental_createSnapshot(name);
         await sandbox.stop();
@@ -29,16 +47,28 @@ export async function daytonaBackend(options: { apiKey?: string } = {}): Promise
         ? await client.get(existing)
         : await client.create({
           autoArchiveInterval: 60,
-          autoStopInterval: 15,
+          autoStopInterval,
           labels: input.tags,
           language: "typescript",
           name: `zap-${input.sessionKey.slice(0, 36)}`,
           ...(snapshot ? { snapshot } : {}),
         });
       if (existing) await sandbox.start();
+      await enforceDaytonaResources(sandbox, resources);
       return daytonaDriver(sandbox, () => sandbox.stop());
     },
   });
+}
+
+export async function enforceDaytonaResources(
+  sandbox: Pick<DaytonaSandbox, "cpu" | "memory" | "resize" | "start" | "stop">,
+  resources: { cpu: number; memory: number },
+) {
+  if (sandbox.cpu === resources.cpu && sandbox.memory === resources.memory) return;
+  const requiresRestart = sandbox.cpu > resources.cpu || sandbox.memory > resources.memory;
+  if (requiresRestart) await sandbox.stop();
+  await sandbox.resize(resources);
+  if (requiresRestart) await sandbox.start();
 }
 
 function daytonaDriver(sandbox: DaytonaSandbox, shutdown: () => Promise<void>): SandboxDriver {
@@ -66,28 +96,3 @@ function daytonaDriver(sandbox: DaytonaSandbox, shutdown: () => Promise<void>): 
 function templateName(key: string) { return `zap-eve-${key.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 48)}`; }
 function shellQuote(value: string) { return `'${value.replace(/'/g, `'"'"'`)}'`; }
 function stringMetadata(value: Record<string, unknown> | undefined, key: string) { return typeof value?.[key] === "string" ? value[key] : undefined; }
-
-interface DaytonaModule {
-  Daytona: new (options: { apiKey: string }) => {
-    create(options: Record<string, unknown>): Promise<DaytonaSandbox>;
-    get(id: string): Promise<DaytonaSandbox>;
-  };
-}
-
-interface DaytonaSandbox {
-  id: string;
-  _experimental_createSnapshot(name: string): Promise<unknown>;
-  fs: {
-    downloadFile(path: string): Promise<ArrayBufferLike>;
-    uploadFile(content: Uint8Array, path: string): Promise<unknown>;
-  };
-  process: {
-    executeCommand(command: string, cwd?: string, env?: Record<string, string>): Promise<{
-      exitCode: number;
-      result: string;
-    }>;
-  };
-  start(): Promise<unknown>;
-  stop(): Promise<void>;
-  updateNetworkSettings(options: { networkBlockAll: boolean }): Promise<unknown>;
-}

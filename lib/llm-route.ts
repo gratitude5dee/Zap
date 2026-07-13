@@ -1,3 +1,4 @@
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { gateway, type LanguageModel } from "ai";
 
@@ -10,6 +11,8 @@ export type LlmRouteSelection = {
   modelId: string;
   route: LlmRoute;
 };
+
+export type LlmPurpose = "judge" | "aura";
 
 export type LlmModelFactoryInput = LlmRouteSelection & {
   apiKey?: string;
@@ -27,6 +30,21 @@ const defaultModels: Record<LlmRoute, string> = {
   gateway: "anthropic/claude-sonnet-4.6",
   openai: "gpt-5.4",
   openrouter: "anthropic/claude-sonnet-4.6",
+};
+
+const purposeDefaultModels: Record<LlmPurpose, Record<LlmRoute, string>> = {
+  aura: {
+    anthropic: "claude-sonnet-4-6",
+    gateway: "google/gemini-3.5-flash",
+    openai: "gpt-5.4",
+    openrouter: "google/gemini-3.5-flash",
+  },
+  judge: {
+    anthropic: "claude-sonnet-4-6",
+    gateway: "google/gemini-2.5-flash",
+    openai: "gpt-5.4",
+    openrouter: "google/gemini-2.5-flash",
+  },
 };
 
 const routeModelEnv: Record<LlmRoute, string> = {
@@ -61,6 +79,32 @@ export function resolveLlmRoute(
   return { modelId, route: rawRoute };
 }
 
+export function defaultLlmModelForRoute(route: LlmRoute) {
+  return defaultModels[route];
+}
+
+/** Resolve judge/Aura models without leaking gateway-style ids into direct providers. */
+export function resolveLlmPurposeRoute(
+  purpose: LlmPurpose,
+  env: LlmRouteEnv = process.env,
+): LlmRouteSelection {
+  const route = resolveLlmRoute(env).route;
+  const routeSpecificKey = `ZAP_${purpose.toUpperCase()}_${route.toUpperCase()}_MODEL`;
+  const legacyKey = `ZAP_${purpose.toUpperCase()}_MODEL`;
+  const legacyModel = route === "gateway" || route === "openrouter" ? env[legacyKey] : undefined;
+  return {
+    modelId: firstNonEmpty(env[routeSpecificKey], legacyModel, purposeDefaultModels[purpose][route]),
+    route,
+  };
+}
+
+export function assertLlmModelCompatible(selection: LlmRouteSelection) {
+  if ((selection.route === "openai" || selection.route === "anthropic") && selection.modelId.includes("/")) {
+    throw new Error(`${selection.route} direct routing requires a provider-native model id without a provider prefix; received ${selection.modelId}.`);
+  }
+  return selection;
+}
+
 /** Create the selected AI SDK model. Direct routes require their provider key. */
 export async function createLlmModel(
   selection: LlmRouteSelection = resolveLlmRoute(),
@@ -73,6 +117,7 @@ export async function createLlmModel(
     throw new Error(`${credentialEnv} is required when ZAP_LLM_ROUTE=${selection.route}.`);
   }
 
+  assertLlmModelCompatible(selection);
   const factory = options.factories?.[selection.route] ?? defaultFactory(selection.route);
   return await factory({ ...selection, apiKey });
 }
@@ -94,22 +139,8 @@ function defaultFactory(route: LlmRoute): LlmModelFactory {
   }
 }
 
-async function createAnthropicModel({ apiKey, modelId }: LlmModelFactoryInput): Promise<LanguageModel> {
-  const packageName = "@ai-sdk/anthropic";
-  try {
-    const module = await import(packageName) as {
-      createAnthropic?: (options: { apiKey?: string }) => (modelId: string) => LanguageModel;
-    };
-    if (typeof module.createAnthropic !== "function") {
-      throw new Error(`${packageName} does not export createAnthropic.`);
-    }
-    return module.createAnthropic({ apiKey })(modelId);
-  } catch (error) {
-    throw new Error(
-      `Direct Anthropic routing requires ${packageName}; install it before setting ZAP_LLM_ROUTE=anthropic.`,
-      { cause: error },
-    );
-  }
+function createAnthropicModel({ apiKey, modelId }: LlmModelFactoryInput): LanguageModel {
+  return createAnthropic({ apiKey })(modelId);
 }
 
 function isLlmRoute(value: string): value is LlmRoute {
