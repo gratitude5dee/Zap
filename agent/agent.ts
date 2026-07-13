@@ -5,7 +5,7 @@ const selection = resolveLlmRoute();
 
 export default defineAgent({
   build: {
-    externalDependencies: ["@asciidev/eve-box", "@daytonaio/sdk", "e2b"],
+    externalDependencies: ["@ai-sdk/anthropic", "@asciidev/eve-box", "@daytonaio/sdk", "e2b"],
   },
   model: selection.route === "gateway" ? selection.modelId : await createLlmModel(selection),
   reasoning: "medium",

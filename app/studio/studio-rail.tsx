@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Copy, FilePlus2, Loader2, Rocket, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { isStudioZapDraft, STUDIO_ZAP_DRAFT_EVENT } from "@/lib/studio-authoring";
 import type { ZapRegistryEntry } from "@/lib/zap-registry";
 import { SpriteWizard } from "./sprite-wizard";
 
@@ -47,6 +48,18 @@ export function StudioRail({ templates }: { readonly templates: ZapRegistryEntry
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { void refreshCatalog(); }, []);
+  useEffect(() => {
+    const openSavedDraft = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isStudioZapDraft(detail)) return;
+      setZapMd(detail.markdown);
+      setPrompts({});
+      setEditorOpen(true);
+      setMessage(`Loaded ${detail.slug} from Zap Operator.`);
+    };
+    window.addEventListener(STUDIO_ZAP_DRAFT_EVENT, openSavedDraft);
+    return () => window.removeEventListener(STUDIO_ZAP_DRAFT_EVENT, openSavedDraft);
+  }, []);
 
   async function refreshCatalog() {
     const response = await fetch("/api/studio/zaps", { cache: "no-store" });
@@ -132,7 +145,7 @@ export function StudioRail({ templates }: { readonly templates: ZapRegistryEntry
       </div>
       <div className="mt-4 space-y-2">
         {catalog.length ? catalog.map((zap) => (
-          <Link className="block rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm hover:border-zap-cyan/40" href={`/${zap.slug}`} key={zap.slug} prefetch={false}>
+          <Link className="block rounded-md border border-white/10 bg-white/[0.04] p-3 text-sm hover:border-zap-cyan/40" href={`/zap/${zap.slug}`} key={zap.slug} prefetch={false}>
             <b className="block truncate">{zap.title ?? zap.slug}</b><span className="text-white/45 text-xs">{zap.status}</span>
           </Link>
         )) : <p className="rounded-md border border-white/10 p-3 text-white/45 text-xs">No deployed zaps yet.</p>}
@@ -141,7 +154,7 @@ export function StudioRail({ templates }: { readonly templates: ZapRegistryEntry
       <div className="mt-3 space-y-2">
         {templates.map((template) => (
           <div className="rounded-md border border-white/10 bg-white/[0.04] p-3" key={template.slug}>
-            <Link className="font-medium text-sm hover:text-zap-cyan" href={`/${template.slug}`} prefetch={false}>{template.title}</Link>
+            <Link className="font-medium text-sm hover:text-zap-cyan" href={`/zap/${template.slug}`} prefetch={false}>{template.title}</Link>
             <p className="mt-1 line-clamp-2 text-white/45 text-xs">{template.description}</p>
             <div className="mt-2 flex items-center justify-between gap-2"><span className="font-mono text-[10px] text-zap-cyan">${template.budget.estimate_usd.toFixed(2)}</span><button className="inline-flex items-center gap-1 text-white/60 text-xs hover:text-white" disabled={busy} onClick={() => void fork(template.slug)}><Copy className="size-3" /> Fork</button></div>
           </div>

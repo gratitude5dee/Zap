@@ -148,7 +148,7 @@ describe("iMessage bridge verification", () => {
     const timestamp = "1700000000";
     const secret = "imessage-signing-secret";
     const signature = createImessageBridgeSignature({ eventId: "evt-1", rawBody, secret, timestamp });
-    const replayStore = new MemoryReplayStore();
+    const replayStore = new MemoryReplayStore(() => 1_700_000_000_000);
     const request = {
       eventId: "evt-1",
       nowMs: 1_700_000_000_000,
@@ -190,6 +190,15 @@ describe("iMessage bridge verification", () => {
       signature,
       timestamp,
     })).resolves.toEqual({ ok: false, reason: "stale" });
+  });
+
+  it("evicts expired development replay ids instead of growing forever", async () => {
+    let now = 1_000;
+    const replayStore = new MemoryReplayStore(() => now);
+    await expect(replayStore.claim("evt-expiring", 1_100)).resolves.toBe(true);
+    await expect(replayStore.claim("evt-expiring", 1_100)).resolves.toBe(false);
+    now = 1_101;
+    await expect(replayStore.claim("evt-expiring", 2_000)).resolves.toBe(true);
   });
 });
 

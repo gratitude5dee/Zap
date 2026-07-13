@@ -1,6 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { submitGeneration } from "../../lib/providers/router.js";
+import { assertPaidToolSession } from "../../lib/channel-run-context.js";
 
 export default defineTool({
   description: "Submit a voice, music, or SFX request through the Zap provider router.",
@@ -12,7 +13,9 @@ export default defineTool({
     runId: z.string(),
     stepId: z.string(),
   }),
-  async execute(input) {
+  approval: () => "user-approval",
+  async execute(input, ctx) {
+    assertPaidToolSession(ctx.session.auth);
     return submitGeneration({
       capability: input.kind,
       inputs: {},

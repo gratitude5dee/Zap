@@ -2,6 +2,7 @@ import { parseSpriteMarkdown } from "@wzrdtech/core";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSpriteComposioSession } from "@/lib/sprite-composio";
+import { assertChannelEnvironment } from "@/lib/channel-runtime";
 import { getSpriteByAuthor, updateSpriteDeployment, upsertSprite } from "@/lib/sprite-store";
 import { deploySpriteToVercel } from "@/lib/sprite-vercel";
 import { getRequestAccessToken, resolveWalletPrincipal } from "@/lib/supabase/server";
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
   try {
     const { spriteMd } = bodySchema.parse(await request.json());
     const spec = parseSpriteMarkdown(spriteMd);
+    assertChannelEnvironment(spec.channels);
     const existing = await getSpriteByAuthor(principal.principalId);
     await upsertSprite({
       authorId: principal.principalId,

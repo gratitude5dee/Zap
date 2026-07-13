@@ -1,7 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { ZapRunError } from "../../lib/zap-errors.js";
-import { resolveChannelAwareRunContext } from "../../lib/channel-run-context.js";
+import { resolveChannelAwareRunContext, resolvePinnedSessionAuth } from "../../lib/channel-run-context.js";
 import { assertSpriteZapAllowed } from "../../lib/sprite-runtime.js";
 import { createZapRunTicket, startZapRunExecution } from "../../lib/zap-runner-server.js";
 import { zapBudget } from "../lib/budget.js";
@@ -24,7 +24,7 @@ export default defineTool({
   async execute(input, ctx) {
     assertSpriteZapAllowed(input.slug);
     const runContext = resolveChannelAwareRunContext({
-      auth: ctx.session.auth.current ?? ctx.session.auth.initiator,
+      auth: resolvePinnedSessionAuth(ctx.session.auth),
       credentialMode: input.credentialMode,
       live: input.live,
     });

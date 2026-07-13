@@ -18,7 +18,7 @@ import {
 import { CodeWindow, Eyebrow, PageShell, SiteNav } from "@/app/_components/zap-chrome";
 import { ZapCard } from "@/app/_components/zap-card";
 import { ZAP_DOCS_URL } from "@/lib/zap-urls";
-import { listZapSpecs } from "@/lib/zap-files";
+import { listCanonicalZapSpecs } from "@/lib/zap-files";
 
 const cliProof = `npx @wzrdtech/zap@0.3.0 init match-day
 cd match-day
@@ -33,7 +33,7 @@ npx @wzrdtech/zap@0.3.0 run agent/skills/zap-world-cup-entrance/Zap.md --json
 }`;
 
 export default async function Page() {
-  const zaps = await listZapSpecs();
+  const zaps = await listCanonicalZapSpecs();
   const featured = zaps.slice(0, 4);
 
   return (

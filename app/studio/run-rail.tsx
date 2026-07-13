@@ -1,47 +1,65 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type RailRun = {
-  assets: Array<{ _id?: string; kind: string; stepId: string }>;
-  feedback: Array<{ kind: string; scores?: { overall?: number; passed?: boolean; vote?: string }; stepId?: string }>;
-  run: {
-    costUsd: number;
-    runId: string;
-    stage?: string;
-    status: string;
-    zapSlug: string;
-    zapUrl?: string;
-  };
-  steps: Array<{ progress: number; status: string; stepId: string }>;
-};
+import { parseStudioRunsPayload, type StudioRailRun } from "@/lib/studio-runs";
 
 export function RunRail() {
   return <RunRailQuery />;
 }
 
 function RunRailQuery() {
-  const [runs, setRuns] = useState<RailRun[] | undefined>();
+  const [runs, setRuns] = useState<StudioRailRun[] | undefined>();
   const [error, setError] = useState<string>();
 
   useEffect(() => {
     let active = true;
+    let eventSource: EventSource | undefined;
+    let fallbackTimer: number | undefined;
+
     async function refresh() {
-      const response = await fetch("/api/studio/runs", { cache: "no-store" });
-      const payload = await response.json().catch(() => ({}));
-      if (!active) return;
-      if (!response.ok) {
-        setError(payload.error ?? "Run ledger is unavailable.");
-        return;
+      try {
+        const response = await fetch("/api/studio/runs", { cache: "no-store" });
+        const payload = await response.json().catch(() => ({}));
+        if (!active) return;
+        if (!response.ok) {
+          setError(payload.error ?? "Run ledger is unavailable.");
+          return;
+        }
+        setError(undefined);
+        setRuns(parseStudioRunsPayload(payload));
+      } catch {
+        if (active) setError("Run ledger is unavailable.");
       }
-      setError(undefined);
-      setRuns(payload.runs ?? []);
     }
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 3_000);
+
+    function startFallback() {
+      if (!active || fallbackTimer !== undefined) return;
+      eventSource?.close();
+      void refresh();
+      fallbackTimer = window.setInterval(() => void refresh(), 3_000);
+    }
+
+    if (typeof window.EventSource === "undefined") {
+      startFallback();
+    } else {
+      eventSource = new window.EventSource("/api/studio/runs/stream");
+      eventSource.addEventListener("runs", (event) => {
+        if (!active || !(event instanceof MessageEvent)) return;
+        try {
+          setRuns(parseStudioRunsPayload(JSON.parse(event.data)));
+          setError(undefined);
+        } catch {
+          startFallback();
+        }
+      });
+      eventSource.addEventListener("stream-error", () => startFallback());
+      eventSource.onerror = () => startFallback();
+    }
+
     return () => {
       active = false;
-      window.clearInterval(timer);
+      eventSource?.close();
+      if (fallbackTimer !== undefined) window.clearInterval(fallbackTimer);
     };
   }, []);
 
@@ -67,7 +85,7 @@ function RailHeader() {
   );
 }
 
-function RunCard({ entry }: { readonly entry: RailRun }) {
+function RunCard({ entry }: { readonly entry: StudioRailRun }) {
   const doneSteps = entry.steps.filter((step) => step.status === "done").length;
   const progress = entry.steps.length ? doneSteps / entry.steps.length : 0;
   const latestJudge = entry.feedback.findLast((feedback) => feedback.kind === "judge_score");

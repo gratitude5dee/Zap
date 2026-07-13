@@ -19,10 +19,35 @@ export const CHANNEL_WEBHOOK_PATHS = {
 } as const;
 
 export const CHANNEL_REQUIRED_ENV = {
-  imessage: ["IMESSAGE_BRIDGE_TOKEN", "IMESSAGE_BRIDGE_URL"],
-  slack: ["REDIS_URL", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"],
-  telegram: ["REDIS_URL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET_TOKEN", "TELEGRAM_TENANT_ID"],
+  imessage: ["CHANNEL_LINK_SECRET", "IMESSAGE_BRIDGE_TOKEN", "IMESSAGE_BRIDGE_URL", "UPSTASH_REDIS_REST_TOKEN", "UPSTASH_REDIS_REST_URL"],
+  slack: ["CHANNEL_LINK_SECRET", "REDIS_URL", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET", "UPSTASH_REDIS_REST_TOKEN", "UPSTASH_REDIS_REST_URL"],
+  telegram: ["CHANNEL_LINK_SECRET", "REDIS_URL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET_TOKEN", "TELEGRAM_TENANT_ID", "UPSTASH_REDIS_REST_TOKEN", "UPSTASH_REDIS_REST_URL"],
 } as const;
+
+export type ZapChannel = keyof typeof CHANNEL_REQUIRED_ENV;
+
+export function missingChannelEnvironment(
+  channels: readonly ZapChannel[],
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  const missing = new Set<string>();
+  for (const channel of channels) {
+    for (const key of CHANNEL_REQUIRED_ENV[channel]) {
+      if (!env[key]?.trim()) missing.add(key);
+    }
+  }
+  return [...missing].sort();
+}
+
+export function assertChannelEnvironment(
+  channels: readonly ZapChannel[],
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  const missing = missingChannelEnvironment(channels, env);
+  if (missing.length > 0) {
+    throw new Error(`Selected Sprite channels are not configured. Missing environment: ${missing.join(", ")}.`);
+  }
+}
 
 const imessageEventSchema = z.object({
   conversationId: z.string().min(1),
@@ -108,6 +133,21 @@ export async function redeemChannelLinkCommand(text: string, principal: ChannelP
     : { linked: false as const, message: "That wallet link code is invalid or expired. Generate a new one in Zap Settings." };
 }
 
+export async function redeemDirectChannelLinkCommand(input: {
+  isDirectMessage: boolean;
+  principal: ChannelPrincipal;
+  text: string;
+}) {
+  if (!parseChannelLinkCommand(input.text)) return null;
+  if (!input.isDirectMessage) {
+    return {
+      linked: false as const,
+      message: "For your security, wallet link codes can only be redeemed in a direct message with Zap.",
+    };
+  }
+  return redeemChannelLinkCommand(input.text, input.principal);
+}
+
 export function chatPrincipalFromMessage(adapterName: string, message: {
   author?: { userId?: string };
   raw?: { team?: string | { id?: string }; team_id?: string };
@@ -120,6 +160,7 @@ export function chatPrincipalFromMessage(adapterName: string, message: {
 export async function resolveChannelSessionAuth(
   principal: ChannelPrincipal,
   store: ChannelLinkStore,
+  options: { isDirectMessage?: boolean } = {},
 ): Promise<ChannelSessionAuth> {
   const normalized = normalizeChannelPrincipal(principal);
   const principalKey = channelPrincipalKey(normalized);
@@ -127,6 +168,7 @@ export async function resolveChannelSessionAuth(
   if (!link) {
     const attributes: Record<string, string> = {
         channelAdapter: normalized.adapter,
+        channelIsDirectMessage: String(options.isDirectMessage === true),
         channelPrincipalKey: principalKey,
         channelTenantId: normalized.tenantId,
         channelUserId: normalized.userId,
@@ -140,6 +182,7 @@ export async function resolveChannelSessionAuth(
   }
   const attributes: Record<string, string> = {
       channelAdapter: normalized.adapter,
+      channelIsDirectMessage: String(options.isDirectMessage === true),
       channelPrincipalKey: principalKey,
       channelTenantId: normalized.tenantId,
       channelUserId: normalized.userId,

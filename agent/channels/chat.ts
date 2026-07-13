@@ -3,13 +3,13 @@ import { createMemoryState } from "@chat-adapter/state-memory";
 import { createRedisState } from "@chat-adapter/state-redis";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
-import type { Message, Thread } from "chat";
+import type { Message, SlashCommandEvent, Thread } from "chat";
 import { chatSdkChannel, messageToUserContent } from "eve/channels/chat-sdk";
 import {
   CHANNEL_WEBHOOK_PATHS,
   chatPrincipalFromMessage,
   getChannelLinkStore,
-  redeemChannelLinkCommand,
+  redeemDirectChannelLinkCommand,
   resolveChannelSessionAuth,
 } from "../../lib/channel-runtime";
 import { isSpriteChannelEnabled } from "../../lib/sprite-runtime";
@@ -38,7 +38,9 @@ export const { bot, channel, send } = chatSdkChannel({
       author: event.user,
       raw: asChatRaw(event.raw),
     });
-    return resolveChannelSessionAuth(principal, getChannelLinkStore());
+    return resolveChannelSessionAuth(principal, getChannelLinkStore(), {
+      isDirectMessage: event.thread?.isDM === true,
+    });
   },
   routes: {
     slack: CHANNEL_WEBHOOK_PATHS.slack,
@@ -57,6 +59,24 @@ bot.onNewMention(async (thread: Thread, message: Message) => {
 bot.onDirectMessage(handleMessage);
 bot.onSubscribedMessage(handleMessage);
 
+bot.onSlashCommand("/link", async (event: SlashCommandEvent) => {
+  if ((event.adapter.name === "slack" || event.adapter.name === "telegram") && !isSpriteChannelEnabled(event.adapter.name)) {
+    await event.channel.post(`${event.adapter.name} is not enabled for this Sprite.`);
+    return;
+  }
+  if (event.adapter.name !== "slack" && event.adapter.name !== "telegram") return;
+  const principal = chatPrincipalFromMessage(event.adapter.name, {
+    author: event.user,
+    raw: asChatRaw(event.raw),
+  });
+  const result = await redeemDirectChannelLinkCommand({
+    isDirectMessage: event.channel.isDM,
+    principal,
+    text: `/link ${event.text}`,
+  });
+  await event.channel.post(result?.message ?? "Usage: /link CODE");
+});
+
 async function handleMessage(
   thread: Thread,
   message: Message,
@@ -69,12 +89,18 @@ async function handleMessage(
     author: message.author,
     raw: asChatRaw(message.raw),
   });
-  const linkResult = await redeemChannelLinkCommand(message.text, principal);
+  const linkResult = await redeemDirectChannelLinkCommand({
+    isDirectMessage: thread.isDM,
+    principal,
+    text: message.text,
+  });
   if (linkResult) {
     await thread.post(linkResult.message);
     return;
   }
-  const auth = await resolveChannelSessionAuth(principal, getChannelLinkStore());
+  const auth = await resolveChannelSessionAuth(principal, getChannelLinkStore(), {
+    isDirectMessage: thread.isDM,
+  });
   await send(messageToUserContent(message), {
     auth,
     thread,

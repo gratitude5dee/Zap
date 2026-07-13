@@ -1,6 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { submitGeneration } from "../../lib/providers/router.js";
+import { assertPaidToolSession } from "../../lib/channel-run-context.js";
 
 export default defineTool({
   description: "Submit a video edit or ReViz request through the Zap provider router.",
@@ -13,7 +14,8 @@ export default defineTool({
     videoUrl: z.string().url(),
   }),
   approval: () => "user-approval",
-  async execute(input) {
+  async execute(input, ctx) {
+    assertPaidToolSession(ctx.session.auth);
     return submitGeneration({
       capability: "video.edit",
       inputs: { videoUrl: input.videoUrl },

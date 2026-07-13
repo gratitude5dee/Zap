@@ -18,7 +18,7 @@ give humans and the authoring agent creative context.
 - Convex schema/functions for `zaps`, `runs`, `steps`, `assets`, `feedback`, `sprites`, and `cronLogs`.
 - Upstash Redis idempotency and provider queue helpers.
 - Slack, Telegram, and iMessage bridge channels with one-time wallet linking and plan-only enforcement for unlinked users.
-- Vercel Sandbox default with Box, Daytona, E2B, Docker, and Eve auto backends behind one contract.
+- ascii.dev Box default with Vercel Sandbox, Daytona, E2B, Docker, and Eve auto backends behind one contract.
 - Vercel AI Gateway default with direct OpenAI, Anthropic, and OpenRouter LLM routes.
 - AWS Bedrock, Vertex AI, GMI Cloud, fal, Prodia, and Runware BYOK adapters behind one deterministic provider router.
 - Workspace packages for core schema/planning, provider queues, agent helpers, and the publishable `@wzrdtech/zap`.
@@ -55,7 +55,26 @@ npm run eve:info
 npm run eve:build
 npm run evals
 npm run test:sandboxes
+npm run test:channels
 ```
 
 Live provider smoke tests are opt-in only. CLI and web runs default to plan-only mode
 unless explicit credentials and a live run are requested.
+
+`npm run evals` is CI-safe: it runs every deterministic recipe contract and visibly
+skips the live-model cases. To run the live Eve target and its separate LLM judge,
+provide an AI Gateway credential in `.env`/`.env.local`, then opt in explicitly:
+
+```bash
+npm run evals:live
+# Or exercise a deployed Eve target:
+npm run evals:live -- --url https://zap.wzrd.tech
+```
+
+The recipe cases use live agent/judge models but keep `run_zap` in dry-run mode, so
+they never submit media-provider work. To exercise the existing visual
+`judge_asset` rubric against a real generated output, also set
+`EVALS_LIVE_ASSET_ID`, `EVALS_LIVE_RUN_ID`, and `EVALS_LIVE_STEP_ID` together.
+That optional case records judge feedback on the referenced run and consumes judge
+model tokens; it does not generate a new asset. Override the separate judge with
+`EVALS_JUDGE_MODEL` when needed.

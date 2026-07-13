@@ -4,6 +4,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { convexServiceToken } from "./convex-service";
 import { parseZapMarkdown, publicZapSpec, type PublicZapSpec, type ZapSpec } from "./zap-schema";
+import { canonicalZapRegistryIndex } from "./zap-registry";
 
 const skillsDir = path.join(process.cwd(), "agent", "skills");
 const getZapBySlug = makeFunctionReference<"query">("zaps:getBySlug");
@@ -39,6 +40,17 @@ export async function listZapSpecs(): Promise<PublicZapSpec[]> {
     .filter((zap): zap is PublicZapSpec => Boolean(zap))
     .filter((zap, index, all) => all.findIndex((candidate) => candidate.zap === zap.zap) === index)
     .sort((left, right) => left.title.localeCompare(right.title));
+}
+
+/** Public gallery membership and ordering come exclusively from the generated registry index. */
+export async function listCanonicalZapSpecs(): Promise<PublicZapSpec[]> {
+  const zaps = await Promise.all(canonicalZapRegistryIndex.zaps.map((entry) => loadLocalZapSpec(entry.slug)));
+  return zaps.map((zap, index) => {
+    if (!zap) {
+      throw new Error(`Canonical Zap ${canonicalZapRegistryIndex.zaps[index]?.slug ?? index} is missing its local Zap.md source.`);
+    }
+    return publicZapSpec(zap);
+  });
 }
 
 export async function readPrompt(slug: string, promptPath?: string) {
@@ -97,4 +109,13 @@ function parsePublishedSource(slug: string, source: string) {
 function getConvexClient() {
   const url = process.env.CONVEX_URL ?? process.env.NEXT_PUBLIC_CONVEX_URL;
   return url ? new ConvexHttpClient(url) : null;
+}
+
+async function loadLocalZapSpec(slug: string): Promise<ZapSpec | null> {
+  try {
+    return parseZapMarkdown(await fs.readFile(path.join(skillsDir, `zap-${slug}`, "Zap.md"), "utf8"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
 }

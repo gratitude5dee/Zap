@@ -12,3 +12,4 @@ supabase/.temp
 dist
 .DS_Store
 *.tsbuildinfo
+agent/connections/sprite-generated-*.ts

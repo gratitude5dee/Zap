@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import { BadgeDollarSign, Film, Sparkles } from "lucide-react";
 import { Eyebrow, PageShell, SiteNav } from "@/app/_components/zap-chrome";
 import { ZapCard } from "@/app/_components/zap-card";
-import { listZapSpecs } from "@/lib/zap-files";
+import { listCanonicalZapSpecs } from "@/lib/zap-files";
 
 export default async function GalleryPage() {
-  const zaps = await listZapSpecs();
+  const zaps = await listCanonicalZapSpecs();
   const totalEstimate = zaps.reduce((sum, zap) => sum + zap.budget.estimate_usd, 0);
 
   return (

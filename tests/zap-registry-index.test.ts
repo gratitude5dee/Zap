@@ -4,6 +4,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { GET } from "../app/api/zaps/route";
+import { listCanonicalZapSpecs } from "../lib/zap-files";
+import { canonicalZapRegistryIndex } from "../lib/zap-registry";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const cli = path.join(repoRoot, "packages/cli/bin/zap.js");
@@ -58,6 +60,11 @@ describe("canonical Zap registry index", () => {
     expect(response.status).toBe(200);
     expect(payload.query).toBe("cup");
     expect(payload.zaps.map((zap) => zap.slug)).toEqual(["world-cup-entrance"]);
+  });
+
+  it("drives the public gallery from the exact canonical index membership and order", async () => {
+    const gallery = await listCanonicalZapSpecs();
+    expect(gallery.map((zap) => zap.zap)).toEqual(canonicalZapRegistryIndex.zaps.map((zap) => zap.slug));
   });
 
   it("finds canonical templates with local-first CLI search", () => {

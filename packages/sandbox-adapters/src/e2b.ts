@@ -1,31 +1,79 @@
 import type { SandboxBackend } from "eve/sandbox";
+import type { Sandbox as E2BSandboxInstance } from "e2b";
 import { createVendorBackend } from "./backend";
+import {
+  resolveE2BSandboxOptions,
+  resolveSandboxResources,
+  type SandboxResources,
+} from "./resources";
 import type { SandboxDriver } from "./session";
 
-export async function e2bBackend(options: { apiKey?: string } = {}): Promise<SandboxBackend> {
+export async function e2bBackend(options: {
+  apiKey?: string;
+  resources?: SandboxResources;
+} = {}): Promise<SandboxBackend> {
   const apiKey = options.apiKey ?? process.env.E2B_API_KEY;
   if (!apiKey) throw new Error("E2B_API_KEY is required when ZAP_SANDBOX_BACKEND=e2b.");
-  const { Sandbox: E2BSandbox } = await import("e2b") as unknown as E2BModule;
+  const resources = options.resources ?? resolveSandboxResources();
+  const resourceOptions = resolveE2BSandboxOptions(resources);
+  const { Sandbox: E2BSandbox, Template } = await import("e2b");
+  const baseTemplateName = templateName(`base-${resources.cpu}-${resources.memoryMb}`);
+  let resourceBaseTemplate: Promise<string> | undefined;
+  const ensureResourceBaseTemplate = () => resourceBaseTemplate ??= ensureE2BResourceBaseTemplate({
+    async build() {
+      await Template.build(Template().fromBaseImage(), baseTemplateName, {
+        apiKey,
+        ...resourceOptions.template,
+      });
+    },
+    exists: () => Template.exists(baseTemplateName, { apiKey }),
+    name: baseTemplateName,
+  });
+
   return createVendorBackend({
     name: "e2b",
     templateName,
     async prewarmDriver(name) {
-      const sandbox = await E2BSandbox.create({ apiKey, metadata: { runtime: "eve", template: name }, timeoutMs: 10 * 60_000 });
+      const sandbox = await E2BSandbox.create({
+        apiKey,
+        metadata: { runtime: "eve", template: name },
+        ...resourceOptions.create,
+      });
       return e2bDriver(sandbox, async () => {
-        await E2BSandbox.createSnapshot(sandbox.sandboxId, { apiKey, name });
-        await sandbox.kill();
+        try {
+          const snapshot = await E2BSandbox.createSnapshot(sandbox.sandboxId, { apiKey });
+          await Template.build(Template().fromTemplate(snapshot.snapshotId), name, {
+            apiKey,
+            ...resourceOptions.template,
+          });
+        } finally {
+          await sandbox.kill();
+        }
       });
     },
     async createDriver(input, snapshot) {
       const existing = typeof input.existingMetadata?.sandboxId === "string" ? input.existingMetadata.sandboxId : undefined;
       const sandbox = existing
         ? await E2BSandbox.connect(existing, { apiKey })
-        : snapshot
-          ? await E2BSandbox.create(snapshot, { apiKey, lifecycle: { onTimeout: { action: "pause", keepMemory: false } }, metadata: input.tags, timeoutMs: 10 * 60_000 })
-          : await E2BSandbox.create({ apiKey, lifecycle: { onTimeout: { action: "pause", keepMemory: false } }, metadata: input.tags, timeoutMs: 10 * 60_000 });
+        : await E2BSandbox.create(snapshot ?? await ensureResourceBaseTemplate(), {
+          apiKey,
+          lifecycle: { onTimeout: { action: "pause", keepMemory: false } },
+          metadata: input.tags,
+          ...resourceOptions.create,
+        });
+      if (existing) await sandbox.setTimeout(resourceOptions.create.timeoutMs);
       return e2bDriver(sandbox, () => sandbox.pause({ keepMemory: false }).then(() => undefined));
     },
   });
+}
+
+export async function ensureE2BResourceBaseTemplate(input: {
+  build: () => Promise<void>;
+  exists: () => Promise<boolean>;
+  name: string;
+}) {
+  if (!await input.exists()) await input.build();
+  return input.name;
 }
 
 function e2bDriver(sandbox: E2BSandboxInstance, shutdown: () => Promise<void>): SandboxDriver {
@@ -52,7 +100,7 @@ function e2bDriver(sandbox: E2BSandboxInstance, shutdown: () => Promise<void>): 
     },
     async setNetworkPolicy(policy) {
       if (policy !== "allow-all" && policy !== "deny-all") throw new Error("E2B adapter currently supports allow-all or deny-all network policy only.");
-      const { Sandbox: E2BSandbox } = await import("e2b") as unknown as E2BModule;
+      const { Sandbox: E2BSandbox } = await import("e2b");
       await E2BSandbox.updateNetwork(sandbox.sandboxId, { allowInternetAccess: policy === "allow-all" });
     },
     shutdown,
@@ -62,29 +110,3 @@ function e2bDriver(sandbox: E2BSandboxInstance, shutdown: () => Promise<void>): 
 
 function templateName(key: string) { return `zap-eve-${key.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 48)}`; }
 function shellQuote(value: string) { return `'${value.replace(/'/g, `'"'"'`)}'`; }
-
-interface E2BModule {
-  Sandbox: {
-    connect(id: string, options: { apiKey: string }): Promise<E2BSandboxInstance>;
-    create(templateOrOptions: string | Record<string, unknown>, options?: Record<string, unknown>): Promise<E2BSandboxInstance>;
-    createSnapshot(id: string, options: { apiKey: string; name: string }): Promise<unknown>;
-    updateNetwork(id: string, options: { allowInternetAccess: boolean }): Promise<unknown>;
-  };
-}
-
-interface E2BSandboxInstance {
-  sandboxId: string;
-  commands: {
-    run(command: string, options?: {
-      cwd?: string;
-      envs?: Record<string, string>;
-      signal?: AbortSignal;
-    }): Promise<{ exitCode: number; stderr: string; stdout: string }>;
-  };
-  files: {
-    read(path: string, options: { format: "bytes" }): Promise<Uint8Array>;
-    write(path: string, content: ArrayBuffer): Promise<unknown>;
-  };
-  kill(): Promise<void>;
-  pause(options: { keepMemory: boolean }): Promise<unknown>;
-}

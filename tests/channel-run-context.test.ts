@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { resolveChannelAwareRunContext } from "../lib/channel-run-context";
+import {
+  assertPaidToolSession,
+  resolveChannelAwareRunContext,
+  resolvePinnedSessionAuth,
+} from "../lib/channel-run-context";
 
 const linked = {
-  attributes: { walletUserId: "supabase-user-1" },
+  attributes: { channelIsDirectMessage: "true", walletUserId: "supabase-user-1" },
   authenticator: "channel-link",
   principalId: "wallet:0x1111111111111111111111111111111111111111",
 };
@@ -24,5 +28,33 @@ describe("channel-aware run context", () => {
 
   it("preserves anonymous and self-hosted BYOK behavior", () => {
     expect(resolveChannelAwareRunContext({ live: true })).toEqual({ credentialMode: "byok" });
+  });
+
+  it("rejects live spend from shared channel threads even when the wallet is linked", () => {
+    expect(() => resolveChannelAwareRunContext({
+      auth: { ...linked, attributes: { ...linked.attributes, channelIsDirectMessage: "false" } },
+      live: true,
+    })).toThrow(/direct message/i);
+  });
+
+  it("pins paid effects to the session initiator and rejects a different approver", () => {
+    const otherWallet = {
+      ...linked,
+      principalId: "wallet:0x2222222222222222222222222222222222222222",
+    };
+    expect(() => resolvePinnedSessionAuth({ current: otherWallet, initiator: linked })).toThrow(/initiating channel identity/i);
+    expect(() => assertPaidToolSession({
+      current: otherWallet,
+      initiator: linked,
+    })).toThrow(/initiating channel identity/i);
+  });
+
+  it("blocks primitive paid effects for an unlinked channel principal", () => {
+    const unlinked = {
+      attributes: { channelIsDirectMessage: "true" },
+      authenticator: "channel-unlinked",
+      principalId: "channel-key",
+    };
+    expect(() => assertPaidToolSession({ current: unlinked, initiator: unlinked })).toThrow(/linked wallet/i);
   });
 });

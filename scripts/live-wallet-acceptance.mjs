@@ -73,6 +73,7 @@ const session = await expectJson(
 if (session.principal?.walletAddress?.toLowerCase() !== account.address.toLowerCase()) {
   throw new Error("Supabase session principal does not match the signing wallet.");
 }
+const runStream = await readStudioRunStream();
 
 const zapMd = `---
 zap: ${slug}
@@ -131,7 +132,7 @@ if (!catalog.zaps?.some((zap) => zap.slug === slug && zap.visibility === "privat
   throw new Error("Published acceptance Zap is missing from the wallet catalog.");
 }
 
-const privateZapPage = await authenticatedFetch(`/${encodeURIComponent(slug)}`);
+const privateZapPage = await authenticatedFetch(`/zap/${encodeURIComponent(slug)}`);
 if (privateZapPage.status !== 200) {
   throw new Error(`Private Zap page returned ${privateZapPage.status}.`);
 }
@@ -214,6 +215,7 @@ console.log(JSON.stringify({
     zapUrl: completedRun.run.zapUrl,
   },
   principalId: session.principal.principalId,
+  runStream,
   secretTypesConfigured: secrets.secrets?.map((secret) => secret.secretType) ?? [],
   sprite: spriteDeployment ?? { status: sprite.status },
   validation,
@@ -256,6 +258,48 @@ async function deployAndWaitForSprite(spriteMd) {
     await new Promise((resolve) => setTimeout(resolve, pollMs));
   }
   throw new Error(`Sprite deployment did not become ready within ${timeoutMs}ms.`);
+}
+
+async function readStudioRunStream() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  let reader;
+  try {
+    const response = await authenticatedFetch("/api/studio/runs/stream", {
+      headers: { accept: "text/event-stream" },
+      signal: controller.signal,
+    });
+    if (response.status !== 200 || !response.body) {
+      throw new Error(`Studio run stream returned ${response.status}.`);
+    }
+    if (!response.headers.get("content-type")?.includes("text/event-stream")) {
+      throw new Error("Studio run stream did not return text/event-stream.");
+    }
+    reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      for (const frame of buffer.split("\n\n")) {
+        if (!frame.startsWith("event: runs\n")) continue;
+        const data = frame.split("\n").find((line) => line.startsWith("data: "))?.slice(6);
+        const payload = data ? JSON.parse(data) : null;
+        if (!payload || !Array.isArray(payload.runs)) {
+          throw new Error("Studio run stream emitted a malformed runs event.");
+        }
+        return { event: "runs", runCount: payload.runs.length, status: response.status };
+      }
+      const boundary = buffer.lastIndexOf("\n\n");
+      if (boundary >= 0) buffer = buffer.slice(boundary + 2);
+    }
+    throw new Error("Studio run stream closed before its initial runs event.");
+  } finally {
+    clearTimeout(timeout);
+    controller.abort();
+    await reader?.cancel().catch(() => undefined);
+  }
 }
 
 async function waitForHostedRun(runId) {
