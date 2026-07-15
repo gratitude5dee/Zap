@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
+import { parseDocument } from "yaml";
 import { convexServiceToken } from "./convex-service";
 import { parseZapMarkdown, publicZapSpec, type PublicZapSpec, type ZapSpec } from "./zap-schema";
 import { canonicalZapRegistryIndex } from "./zap-registry";
@@ -13,8 +14,18 @@ const listZaps = makeFunctionReference<"query">("zaps:list");
 const publishedPromptBundles = new Map<string, Record<string, string>>();
 
 export async function loadZapFromSkill(slug: string, authorId?: string): Promise<PublicZapSpec | null> {
-  const spec = await loadZapSpec(slug, authorId);
+  const spec = await loadPublicZapSpec(slug, authorId);
   return spec ? publicZapSpec(spec) : null;
+}
+
+/**
+ * Public web, embed, and generic run entry points must use this loader.
+ * `loadZapSpec` deliberately remains available for durable internal run
+ * recovery, including private service recipes such as Air.
+ */
+export async function loadPublicZapSpec(slug: string, authorId?: string): Promise<ZapSpec | null> {
+  const spec = await loadZapSpec(slug, authorId);
+  return spec && spec.publish?.visibility !== "private" ? spec : null;
 }
 
 export async function loadZapSpec(slug: string, authorId?: string): Promise<ZapSpec | null> {
@@ -22,7 +33,7 @@ export async function loadZapSpec(slug: string, authorId?: string): Promise<ZapS
   if (published) return published;
   const file = path.join(skillsDir, `zap-${slug}`, "Zap.md");
   try {
-    return parseZapMarkdown(await fs.readFile(file, "utf8"));
+    return parseZapSource(await fs.readFile(file, "utf8"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
@@ -88,7 +99,7 @@ async function listPublishedZapSpecs() {
     return rows.flatMap((row) => {
       if (!row.source) return [];
       const spec = parsePublishedSource(row.slug, row.source);
-      return spec ? [publicZapSpec(spec)] : [];
+      return spec && spec.publish?.visibility !== "private" ? [publicZapSpec(spec)] : [];
     });
   } catch {
     return [];
@@ -100,10 +111,34 @@ function parsePublishedSource(slug: string, source: string) {
     const parsed = JSON.parse(source) as { prompts?: Record<string, string>; zapMd?: string };
     if (!parsed.zapMd) return null;
     publishedPromptBundles.set(slug, parsed.prompts ?? {});
-    return parseZapMarkdown(parsed.zapMd);
+    return parseZapSource(parsed.zapMd);
   } catch {
-    return parseZapMarkdown(source);
+    return parseZapSource(source);
   }
+}
+
+/**
+ * Preserve explicit private visibility from source in addition to schema
+ * normalization. This keeps public exposure fail-closed across package/schema
+ * upgrades and is especially important for local service recipes.
+ */
+function parseZapSource(markdown: string): ZapSpec {
+  const spec = parseZapMarkdown(markdown);
+  return readPrivateVisibility(markdown) ? {
+    ...spec,
+    publish: { ...spec.publish, visibility: "private" },
+  } : spec;
+}
+
+function readPrivateVisibility(markdown: string) {
+  const match = markdown.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return false;
+  const parsed = parseDocument(match[1]).toJS();
+  if (typeof parsed !== "object" || parsed === null || !("publish" in parsed)) return false;
+  const publish = (parsed as { publish?: unknown }).publish;
+  return typeof publish === "object"
+    && publish !== null
+    && (publish as { visibility?: unknown }).visibility === "private";
 }
 
 function getConvexClient() {
@@ -113,7 +148,7 @@ function getConvexClient() {
 
 async function loadLocalZapSpec(slug: string): Promise<ZapSpec | null> {
   try {
-    return parseZapMarkdown(await fs.readFile(path.join(skillsDir, `zap-${slug}`, "Zap.md"), "utf8"));
+    return parseZapSource(await fs.readFile(path.join(skillsDir, `zap-${slug}`, "Zap.md"), "utf8"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;

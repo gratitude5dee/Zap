@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   active: new Map<string, number>(),
@@ -106,6 +106,9 @@ vi.mock("../lib/run-ledger", () => ({
 
 vi.mock("../lib/blob-store", () => ({
   deletePersistedAsset: vi.fn(),
+  hasAirBlobCredentials: () => Boolean(
+    process.env.BLOB_READ_WRITE_TOKEN?.trim() || process.env.BLOB_STORE_ID?.trim(),
+  ),
 }));
 
 import {
@@ -114,6 +117,7 @@ import {
   isAirServiceAuthorized,
   parseAirUploadInput,
   parseAirVideoSubmitInput,
+  recordAirVideoFailure,
   recordAirVideoAssetExpiry,
   scheduleAirVideoAssetCleanup,
   submitAirVideoRun,
@@ -139,6 +143,10 @@ describe("Air video service", () => {
     process.env.ZAP_AIR_DAILY_CAP_USD = "5";
     process.env.ZAP_AIR_SERVICE_TOKEN = "air-service-token";
     delete process.env.ZAP_AIR_CONCURRENCY_LIMIT;
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("requires an exact private bearer token", () => {
@@ -313,6 +321,34 @@ describe("Air video service", () => {
     expect(JSON.stringify([...state.records.values()])).not.toContain("A neon owl flies through rain.");
   });
 
+  it("accepts a connected Vercel Blob store in production without a static Blob token", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
+    vi.stubEnv("BLOB_STORE_ID", "store_air_test");
+    vi.stubEnv("CONVEX_URL", "https://air.convex.cloud");
+    vi.stubEnv("ZAP_CONVEX_SERVICE_TOKEN", "convex-service-token");
+    vi.stubEnv("ZAP_AIR_MAX_RUN_USD", "5");
+
+    await expect(submitAirVideoRun(
+      parseAirVideoSubmitInput({ prompt: "A connected Blob store is valid production configuration." }),
+      "imessage.event.oidc.123456",
+    )).resolves.toMatchObject({ status: "queued" });
+  });
+
+  it("fails production preflight when neither Blob credential is configured", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
+    vi.stubEnv("BLOB_STORE_ID", "");
+    vi.stubEnv("CONVEX_URL", "https://air.convex.cloud");
+    vi.stubEnv("ZAP_CONVEX_SERVICE_TOKEN", "convex-service-token");
+
+    await expect(submitAirVideoRun(
+      parseAirVideoSubmitInput({ prompt: "The Blob credential gate must fail closed." }),
+      "imessage.event.no-blob.123456",
+    )).rejects.toMatchObject({ code: "SERVICE_CONFIGURATION", status: 503 });
+    expect(state.submit).not.toHaveBeenCalled();
+  });
+
   it("fails closed as submission_unknown after an ambiguous provider handoff", async () => {
     state.submit.mockRejectedValueOnce(new Error("network vanished"));
     const input = parseAirVideoSubmitInput({ prompt: "A safely recoverable request." });
@@ -363,5 +399,35 @@ describe("Air video service", () => {
     });
     expect(completed.video?.expiresAt).toBe(new Date(expiresAtMs).toISOString());
     expect(JSON.stringify(completed)).not.toContain("gmi_request_1");
+  });
+
+  it("returns bounded progress and a stable failure code without provider diagnostics", async () => {
+    const created = await submitAirVideoRun(
+      parseAirVideoSubmitInput({ prompt: "A status contract test." }),
+      "imessage.event.failure-status.123456",
+    );
+    state.runs.set(created.runId, {
+      ...(state.runs.get(created.runId) ?? {}),
+      error: "provider response included a secret URL",
+      status: "running",
+    });
+    state.steps.set(created.runId, [{
+      error: "provider response included a secret URL",
+      progress: 0.5,
+      status: "running",
+      stepId: "seedance",
+    }]);
+
+    const running = await getAirVideoRun(created.runId);
+    expect(running).toMatchObject({ progress: 50, status: "running" });
+    expect(JSON.stringify(running)).not.toContain("secret URL");
+
+    state.steps.set(created.runId, [{ progress: 250, status: "running", stepId: "seedance" }]);
+    await expect(getAirVideoRun(created.runId)).resolves.toMatchObject({ progress: 99, status: "running" });
+
+    await recordAirVideoFailure(created.runId, "provider response included a secret URL");
+    const failed = await getAirVideoRun(created.runId);
+    expect(failed).toMatchObject({ errorCode: "PROVIDER_FAILED", progress: 100, status: "dead_letter" });
+    expect(JSON.stringify(failed)).not.toContain("secret URL");
   });
 });

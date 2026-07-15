@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const slug = extractSlug(target);
   if (!slug) return NextResponse.json({ error: "A Zap URL is required." }, { status: 400 });
   const zap = await loadZapFromSkill(slug);
+  if (!zap) return NextResponse.json({ error: "Zap not found." }, { status: 404 });
   const origin = publicOrigin(request);
   const embedUrl = `${origin}/embed/${encodeURIComponent(slug)}`;
   return NextResponse.json({

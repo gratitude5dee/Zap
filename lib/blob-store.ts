@@ -14,6 +14,42 @@ export class AirVideoOutputError extends Error {
   }
 }
 
+export type AirVideoPersistenceOptions = {
+  /**
+   * Called after provider media validation but before the irreversible Blob
+   * write. Air uses this to durably schedule deletion before an object exists,
+   * eliminating the crash window that otherwise leaves an untracked MP4.
+   */
+  beforeBlobWrite: (storageKey: string) => Promise<void>;
+};
+
+type AirBlobAuth =
+  | { kind: "static"; token: string }
+  | { kind: "vercel-oidc" };
+
+/**
+ * Air artifacts are written only by the server. A linked Vercel Blob store
+ * supplies its store ID and lets @vercel/blob obtain the managed OIDC token;
+ * a legacy static read-write token remains supported for other deployments.
+ */
+function resolveAirBlobAuth(): AirBlobAuth | undefined {
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  if (token) return { kind: "static", token };
+  if (process.env.BLOB_STORE_ID?.trim()) return { kind: "vercel-oidc" };
+  return undefined;
+}
+
+/** Used by Air's production preflight without exposing either credential. */
+export function hasAirBlobCredentials() {
+  return resolveAirBlobAuth() !== undefined;
+}
+
+function airBlobCommandOptions(auth: AirBlobAuth) {
+  // Deliberately omit `token` in OIDC mode. The Vercel SDK reads
+  // BLOB_STORE_ID and obtains/refreshes VERCEL_OIDC_TOKEN itself.
+  return auth.kind === "static" ? { token: auth.token } : {};
+}
+
 export async function persistRemoteAsset(url: string, key: string) {
   assertAllowedRemoteAssetUrl(url);
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
@@ -36,7 +72,7 @@ export async function persistRemoteAsset(url: string, key: string) {
  * is copied immediately to Blob, must be an MP4 within the iMessage transfer
  * budget, and never falls back to a provider-owned URL in production.
  */
-export async function persistAirVideoOutput(url: string, key: string) {
+export async function persistAirVideoOutput(url: string, key: string, options: AirVideoPersistenceOptions) {
   try {
     assertAllowedRemoteAssetUrl(url);
   } catch (error) {
@@ -45,8 +81,13 @@ export async function persistAirVideoOutput(url: string, key: string) {
       true,
     );
   }
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) throw new AirVideoOutputError("BLOB_READ_WRITE_TOKEN is required for Air video output.", false);
+  const auth = resolveAirBlobAuth();
+  if (!auth) {
+    throw new AirVideoOutputError(
+      "BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID is required for Air video output.",
+      false,
+    );
+  }
 
   let response: Response;
   try {
@@ -83,20 +124,24 @@ export async function persistAirVideoOutput(url: string, key: string) {
   // `readBoundedVideoBody` creates a fresh, non-shared Uint8Array. Narrow it
   // here for TypeScript's DOM Blob overload while preserving the exact bytes.
   const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  const stored = await put(`${sanitizeStorageKey(key)}.mp4`, new Blob([body], { type: "video/mp4" }), {
+  const storageKey = `${sanitizeStorageKey(key)}.mp4`;
+  // The caller's durable cleanup record is a precondition for creating a
+  // temporary Air artifact. If it cannot be written, no Blob is created.
+  await options.beforeBlobWrite(storageKey);
+  const stored = await put(storageKey, new Blob([body], { type: "video/mp4" }), {
     access: "public",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "video/mp4",
-    token,
+    ...airBlobCommandOptions(auth),
   });
-  return { storageKey: stored.pathname, url: stored.url };
+  return { storageKey, url: stored.url };
 }
 
 export async function deletePersistedAsset(storageKey: string) {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) throw new Error("BLOB_READ_WRITE_TOKEN is required for Air video cleanup.");
-  await del(storageKey, { token });
+  const auth = resolveAirBlobAuth();
+  if (!auth) throw new Error("BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID is required for Air video cleanup.");
+  await del(storageKey, airBlobCommandOptions(auth));
 }
 
 export async function persistDataUrlAsset(dataUrl: string, key: string) {

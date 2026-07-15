@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { deletePersistedAsset } from "./blob-store";
+import { deletePersistedAsset, hasAirBlobCredentials } from "./blob-store";
 import { submitGeneration } from "./providers/router";
 import { getRedis } from "./redis";
 import { createRunLedger, getRunSnapshot, redactAirVideoAsset, updateRunLedger, upsertStepLedger } from "./run-ledger";
@@ -88,7 +88,11 @@ type CachedAirUploadTicket = {
 };
 
 export type AirVideoRunResponse = {
+  /** Stable, sanitized code for a failed/uncertain Air run; never provider text. */
+  errorCode?: string;
   estimatedUsd: number;
+  /** Integer percent (0–100), safe to render in the iMessage worker. */
+  progress: number;
   replayed?: boolean;
   retryable: boolean;
   runId: string;
@@ -387,13 +391,33 @@ export async function getAirVideoRun(runId: string): Promise<AirVideoRunResponse
 
   const snapshot = await getRunSnapshot(runId);
   const response = responseFromSnapshot(record, snapshot);
-  if (response.status !== record.status) {
-    await saveAirRunRecord({ ...record, status: response.status, updatedAt: Date.now() });
+  if (response.status !== record.status || (response.errorCode && response.errorCode !== record.errorCode)) {
+    await saveAirRunRecord({
+      ...record,
+      ...(response.errorCode ? { errorCode: response.errorCode } : {}),
+      status: response.status,
+      updatedAt: Date.now(),
+    });
   }
   if (response.status === "video_ready" || response.status === "dead_letter") {
     await releaseAirVideoConcurrency(runId).catch(() => undefined);
   }
   return response;
+}
+
+/** Persist a whitelisted failure code for Air without ever storing provider text. */
+export async function recordAirVideoFailure(runId: string, errorCode?: string) {
+  if (!/^air_[a-f0-9]{24}$/.test(runId)) return;
+  const record = await getAirRunRecord(runId);
+  if (!record || record.status === "video_ready") return;
+  const stableErrorCode = sanitizeAirErrorCode(errorCode) ?? "PROVIDER_FAILED";
+  if (record.status === "dead_letter" && record.errorCode === stableErrorCode) return;
+  await saveAirRunRecord({
+    ...record,
+    errorCode: stableErrorCode,
+    status: "dead_letter",
+    updatedAt: Date.now(),
+  });
 }
 
 /** Called by the poller/webhook path as soon as a provider result becomes terminal. */
@@ -414,8 +438,10 @@ export async function touchAirVideoConcurrency(runId: string) {
 
 /** Keep generated MP4s available long enough for iMessage delivery, then remove them. */
 export async function scheduleAirVideoAssetCleanup(storageKey: string, expiresAtMs = Date.now() + AIR_ASSET_TTL_MS) {
-  const redis = getRedis();
-  if (!redis || !storageKey) return;
+  if (!storageKey) throw new AirVideoServiceError("SERVICE_CONFIGURATION", 503, true);
+  // A Blob write is now conditional on this record. Never silently skip the
+  // schedule when Redis is absent, or a crash can leave a public MP4 orphaned.
+  const redis = requireRedis();
   const expiresAt = Math.max(Date.now() + 1_000, Math.floor(expiresAtMs));
   await redis.zadd(AIR_ASSET_CLEANUP_KEY, { member: storageKey, score: expiresAt });
   // Earlier releases applied a 48h key TTL. Clear it whenever a new entry is
@@ -481,7 +507,7 @@ function responseFromSnapshot(record: AirVideoRunRecord, snapshot: Awaited<Retur
 
   // Do not convert an ambiguous handoff to a resubmittable state until a
   // durable provider request id has been recorded.
-  if (!(record.status === "submission_unknown" && !step?.providerRequestId)) {
+  if (record.status !== "dead_letter" && record.status !== "video_ready" && !(record.status === "submission_unknown" && !step?.providerRequestId)) {
     if (snapshot.run?.status === "failed" || snapshot.run?.status === "canceled" || step?.status === "failed" || step?.status === "canceled") {
       status = "dead_letter";
     } else if (snapshot.run?.status === "done" || step?.status === "done") {
@@ -493,14 +519,18 @@ function responseFromSnapshot(record: AirVideoRunRecord, snapshot: Awaited<Retur
     }
   }
 
+  const publicStatus = status === "validated" ? "retryable" : status;
+  const errorCode = publicAirErrorCode({ record, snapshot, status: publicStatus, video: Boolean(video) });
   return {
+    ...(errorCode ? { errorCode } : {}),
     estimatedUsd: record.estimatedUsd,
+    progress: publicAirProgress(publicStatus, step?.progress),
     // An ambiguous GMI handoff must be surfaced for operator reconciliation,
     // never as a signal for Air to automatically submit again.
     retryable: status === "retryable" || status === "validated",
     runId: record.runId,
-    status: status === "validated" ? "retryable" : status,
-    ...(status === "video_ready" && video
+    status: publicStatus,
+    ...(publicStatus === "video_ready" && video
       ? {
           video: {
             // Old records from before this field was introduced retain a
@@ -515,13 +545,68 @@ function responseFromSnapshot(record: AirVideoRunRecord, snapshot: Awaited<Retur
 }
 
 function responseForRecord(record: AirVideoRunRecord): AirVideoRunResponse {
+  const status = record.status === "validated" ? "retryable" : record.status;
+  const errorCode = publicAirErrorCode({ record, status, video: false });
   return {
+    ...(errorCode ? { errorCode } : {}),
     estimatedUsd: record.estimatedUsd,
-    retryable: record.status === "retryable" || record.status === "validated",
+    progress: publicAirProgress(status),
+    retryable: status === "retryable",
     runId: record.runId,
-    status: record.status === "validated" ? "retryable" : record.status,
+    status,
   };
 }
+
+function publicAirProgress(status: AirVideoRunStatus, value?: number) {
+  if (status === "video_ready" || status === "dead_letter") return 100;
+  const fallback = status === "running" ? 50 : 0;
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  // A non-terminal provider callback cannot advertise a finished Air video.
+  const percent = value > 1 ? value : value * 100;
+  return Math.min(99, Math.max(0, Math.round(percent)));
+}
+
+function publicAirErrorCode({
+  record,
+  snapshot,
+  status,
+  video,
+}: {
+  record: AirVideoRunRecord;
+  snapshot?: Awaited<ReturnType<typeof getRunSnapshot>>;
+  status: AirVideoRunStatus;
+  video: boolean;
+}) {
+  if (status === "submission_unknown") return sanitizeAirErrorCode(record.errorCode) ?? "SUBMISSION_UNKNOWN";
+  if (status === "retryable") return sanitizeAirErrorCode(record.errorCode) ?? "SUBMISSION_UNAVAILABLE";
+  if (status !== "dead_letter") return undefined;
+  if (sanitizeAirErrorCode(record.errorCode)) return sanitizeAirErrorCode(record.errorCode);
+  const step = snapshot?.steps.find((candidate) => candidate.stepId === AIR_GENERATE_STEP_ID);
+  if ((snapshot?.run?.status === "done" || step?.status === "done") && !video) return "OUTPUT_MISSING";
+  return "PROVIDER_FAILED";
+}
+
+function sanitizeAirErrorCode(value?: string) {
+  return value && airErrorCodes.has(value) ? value : undefined;
+}
+
+const airErrorCodes = new Set([
+  "ADMISSION_UNAVAILABLE",
+  "CONCURRENCY_LIMIT",
+  "DAILY_SPEND_CAP",
+  "OUTPUT_MISSING",
+  "OUTPUT_VALIDATION_FAILED",
+  "PER_RUN_SPEND_CAP",
+  "POLL_DEADLINE_EXCEEDED",
+  "POLL_UNAVAILABLE",
+  "PROVIDER_FAILED",
+  "PROVIDER_REJECTED",
+  "SERVICE_CONFIGURATION",
+  "SUBMISSION_PRECONDITION_FAILED",
+  "SUBMISSION_UNAVAILABLE",
+  "SUBMISSION_UNKNOWN",
+  "VIDEO_EXPIRED",
+]);
 
 function replayResponse(response: AirVideoRunResponse, replayed: boolean) {
   return replayed ? { ...response, replayed: true } : response;
@@ -648,8 +733,10 @@ function requireAirGenerationRuntime() {
   requireGmiApiKey();
   requireRedis();
   if (process.env.NODE_ENV === "production") {
+    if (!hasAirBlobCredentials()) {
+      throw new AirVideoServiceError("SERVICE_CONFIGURATION", 503, true);
+    }
     for (const name of [
-      "BLOB_READ_WRITE_TOKEN",
       "CONVEX_URL",
       "ZAP_AIR_IDEMPOTENCY_HMAC_SECRET",
       "ZAP_CONVEX_SERVICE_TOKEN",

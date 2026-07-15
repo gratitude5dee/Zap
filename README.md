@@ -32,6 +32,11 @@ Provider webhook callbacks are public so hosted providers can report completion;
 poll drain uses `ZAP_POLL_DRAIN_SECRET`, and Eve operational endpoints accept
 Supabase sessions, Vercel OIDC, local dev, or `ZAP_AGENT_TOKEN`.
 
+The private Air iMessage video service fails closed unless its output store has
+either a connected Vercel Blob `BLOB_STORE_ID` (using Vercel-managed OIDC) or
+a legacy server-only `BLOB_READ_WRITE_TOKEN`. Never expose either credential
+to a browser.
+
 ## CLI Installation
 
 Zap requires Node 24.x. For a one-off command, use the scoped package directly:

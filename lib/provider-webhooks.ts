@@ -1,6 +1,7 @@
 import type { ProviderPollResult } from "./provider-types";
 import { AirVideoOutputError, persistAirVideoOutput } from "./blob-store";
 import {
+  recordAirVideoFailure,
   recordAirVideoAssetExpiry,
   releaseAirVideoConcurrency,
   scheduleAirVideoAssetCleanup,
@@ -88,6 +89,7 @@ export async function recordProviderProgress(provider: ProviderWebhookProvider |
 
   let effectiveResult = result;
   let storageKey: string | undefined;
+  let airAssetExpiresAtMs: number | undefined;
   if (isAirVideoRun && result.status === "done") {
     if (!result.outputUrl) {
       effectiveResult = { ...result, error: "OUTPUT_MISSING", outputUrl: undefined, status: "failed" };
@@ -97,7 +99,14 @@ export async function recordProviderProgress(provider: ProviderWebhookProvider |
       throw new Error("AIR_OUTPUT_PERSISTENCE_BUSY");
     } else {
       try {
-        const stored = await persistAirVideoOutput(result.outputUrl, `air/${meta.runId}/${meta.stepId}`);
+        const expiresAtMs = Date.now() + 24 * 60 * 60 * 1000;
+        const stored = await persistAirVideoOutput(result.outputUrl, `air/${meta.runId}/${meta.stepId}`, {
+          // This durable queue write happens before Blob.put. A process crash
+          // after the write therefore leaves a deletion plan for every object
+          // that may have been created, instead of an orphaned public MP4.
+          beforeBlobWrite: (plannedStorageKey) => scheduleAirVideoAssetCleanup(plannedStorageKey, expiresAtMs),
+        });
+        airAssetExpiresAtMs = expiresAtMs;
         effectiveResult = { ...result, outputUrl: stored.url };
         storageKey = stored.storageKey;
       } catch (error) {
@@ -111,6 +120,13 @@ export async function recordProviderProgress(provider: ProviderWebhookProvider |
   const status = effectiveResult.status === "failed" ? "failed" : effectiveResult.status === "done" ? "done" : effectiveResult.status === "queued" ? "queued" : "running";
   const progress = effectiveResult.progress ?? (status === "done" || status === "failed" ? 1 : status === "queued" ? 0 : 0.5);
 
+  // Only the private Air record needs a compact, stable failure contract. The
+  // generic ledger may retain provider diagnostics for authenticated operators,
+  // but Air's GET endpoint must never relay arbitrary provider text.
+  if (isAirVideoRun && status === "failed") {
+    await recordAirVideoFailure(meta.runId, effectiveResult.error);
+  }
+
   let assetId: string | undefined;
   // The asset is durable before the step is marked done. This leaves a retry
   // path if a process stops between Blob persistence and ledger completion.
@@ -123,12 +139,10 @@ export async function recordProviderProgress(provider: ProviderWebhookProvider |
       storageKey,
       url: effectiveResult.outputUrl,
     });
-    if (isAirVideoRun && storageKey) {
-      const expiresAtMs = Date.now() + 24 * 60 * 60 * 1000;
-      // Persist this before the step becomes done, so every completed Air run
-      // returns a stable, bounded Blob capability expiry.
-      await scheduleAirVideoAssetCleanup(storageKey, expiresAtMs);
-      await recordAirVideoAssetExpiry(meta.runId, expiresAtMs);
+    if (isAirVideoRun && storageKey && airAssetExpiresAtMs) {
+      // Cleanup was durably scheduled before Blob.put; persist the matching
+      // public capability expiry before publishing the terminal step state.
+      await recordAirVideoAssetExpiry(meta.runId, airAssetExpiresAtMs);
     }
   }
 
