@@ -1,9 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { Redis } from "@upstash/redis";
 
 let redis: Redis | null | undefined;
 const twoDays = 60 * 60 * 48;
 const providerPollQueuePrefix = "zap:poll";
 const providerPollDeadLetterKey = `${providerPollQueuePrefix}:dead`;
+const providerPollDrainLockKey = `${providerPollQueuePrefix}:drain-lock`;
+const providerPollDrainLockTtlSeconds = 5 * 60;
 
 // Provider queue work must survive a function crash after dequeue. The lease
 // is intentionally longer than a normal cron invocation; a later drain moves
@@ -35,12 +38,44 @@ export type LeasedProviderPollJob = ProviderPollJob & {
   receipt: string;
 };
 
+/** Opaque owner token for the short-lived global provider-poll drain mutex. */
+export interface ProviderPollDrainLease {
+  readonly token: string;
+}
+
 export function getRedis() {
   if (redis !== undefined) return redis;
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   redis = url && token ? new Redis({ token, url }) : null;
   return redis;
+}
+
+/**
+ * Vercel Cron can overlap or duplicate an invocation. Queue visibility leases
+ * protect individual jobs, while this mutex prevents a second whole drain
+ * pass from creating avoidable provider/ledger load during the same window.
+ */
+export async function acquireProviderPollDrainLease(): Promise<ProviderPollDrainLease | undefined> {
+  const client = getRedis();
+  if (!client) return undefined;
+  const token = randomUUID();
+  const acquired = await client.set(providerPollDrainLockKey, token, {
+    ex: providerPollDrainLockTtlSeconds,
+    nx: true,
+  });
+  return acquired === "OK" ? Object.freeze({ token }) : undefined;
+}
+
+/** Release only the exact lease owned by this invocation; never delete a successor's lock. */
+export async function releaseProviderPollDrainLease(lease: ProviderPollDrainLease): Promise<boolean> {
+  const client = getRedis();
+  if (!client) return false;
+  const script = client.createScript<number>([
+    "if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end",
+    "return redis.call('DEL', KEYS[1])",
+  ].join("\n"));
+  return (await script.eval([providerPollDrainLockKey], [lease.token])) === 1;
 }
 
 export async function getIdempotencyKey(key: string) {

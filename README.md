@@ -29,7 +29,8 @@ Copy `.env.example`; it documents public, server-only, channel, Sprite, sandbox,
 
 Public gallery, docs, quickstart, recipe pages, registry search, and plan-only runs are open. Studio and WZRD Cloud spend require a thirdweb-authenticated Supabase wallet session. BYOK CLI and self-hosted live runs do not require thirdweb.
 Provider webhook callbacks are public so hosted providers can report completion;
-poll drain uses `ZAP_POLL_DRAIN_SECRET`, and Eve operational endpoints accept
+the legacy Convex poll drain uses `ZAP_POLL_DRAIN_SECRET`, while Vercel's
+two-minute fallback cron uses `CRON_SECRET`, and Eve operational endpoints accept
 Supabase sessions, Vercel OIDC, local dev, or `ZAP_AGENT_TOKEN`.
 
 The private Air iMessage video service fails closed unless its output store has

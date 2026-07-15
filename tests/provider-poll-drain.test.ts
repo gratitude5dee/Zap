@@ -3,6 +3,7 @@ import type { LeasedProviderPollJob } from "../lib/redis";
 
 const state = vi.hoisted(() => ({
   acknowledge: vi.fn(),
+  acquireDrainLease: vi.fn(),
   cleanup: vi.fn(),
   deadLetter: vi.fn(),
   defer: vi.fn(),
@@ -10,6 +11,7 @@ const state = vi.hoisted(() => ({
   poll: vi.fn(),
   record: vi.fn(),
   recover: vi.fn(),
+  releaseDrainLease: vi.fn(),
   requeue: vi.fn(),
 }));
 
@@ -21,11 +23,13 @@ vi.mock("@/lib/provider-webhooks", () => ({
 }));
 vi.mock("@/lib/redis", () => ({
   acknowledgeProviderPoll: (...args: unknown[]) => state.acknowledge(...args),
+  acquireProviderPollDrainLease: (...args: unknown[]) => state.acquireDrainLease(...args),
   deadLetterProviderPoll: (...args: unknown[]) => state.deadLetter(...args),
   deferProviderPoll: (...args: unknown[]) => state.defer(...args),
   dequeueProviderPoll: (...args: unknown[]) => state.dequeue(...args),
   isProviderPollDeadlineExceeded: (job: { deadlineAtMs: number }) => Date.now() >= job.deadlineAtMs,
   recoverProviderPolls: (...args: unknown[]) => state.recover(...args),
+  releaseProviderPollDrainLease: (...args: unknown[]) => state.releaseDrainLease(...args),
   requeueProviderPoll: (...args: unknown[]) => state.requeue(...args),
 }));
 vi.mock("@/lib/providers/router", () => ({
@@ -66,6 +70,7 @@ describe("provider poll drain durability", () => {
     vi.setSystemTime(new Date("2026-07-15T00:00:00Z"));
     vi.stubEnv("ZAP_POLL_DRAIN_SECRET", "cron-secret");
     state.acknowledge.mockReset().mockResolvedValue(true);
+    state.acquireDrainLease.mockReset().mockResolvedValue({ token: "drain-lease" });
     state.cleanup.mockReset().mockResolvedValue(0);
     state.deadLetter.mockReset().mockResolvedValue(true);
     state.defer.mockReset().mockResolvedValue(true);
@@ -73,6 +78,7 @@ describe("provider poll drain durability", () => {
     state.poll.mockReset().mockResolvedValue({ progress: 0.5, status: "running" });
     state.record.mockReset().mockResolvedValue({ observed: true });
     state.recover.mockReset().mockResolvedValue(0);
+    state.releaseDrainLease.mockReset().mockResolvedValue(true);
     state.requeue.mockReset().mockResolvedValue(true);
   });
 
@@ -96,6 +102,19 @@ describe("provider poll drain durability", () => {
     expect(state.requeue).toHaveBeenCalledWith(leased);
     expect(state.deadLetter).not.toHaveBeenCalled();
     expect(state.acknowledge).not.toHaveBeenCalled();
+  });
+
+  it("returns a safe no-op when another cron invocation owns the global drain lease", async () => {
+    state.acquireDrainLease.mockResolvedValueOnce(undefined);
+
+    const response = await POST(new Request("https://zap.test/api/providers/poll/drain", {
+      headers: { "x-zap-cron-secret": "cron-secret" },
+      method: "POST",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ cleanedAssets: 0, drained: 0, results: [] });
+    expect(state.dequeue).not.toHaveBeenCalled();
   });
 
   it("enforces the absolute 60-minute deadline before a further provider poll", async () => {
