@@ -20,7 +20,10 @@ Vercel app env:
 - `CONVEX_URL`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
-- `BLOB_READ_WRITE_TOKEN`
+- Air video output: a connected Vercel Blob `BLOB_STORE_ID` (managed OIDC) or
+  a legacy server-only `BLOB_READ_WRITE_TOKEN`. Air fails closed if neither is
+  configured; the generic Zap artifact helpers continue to use the static
+  token when enabled.
 - `ZAP_SANDBOX_BACKEND=box` (Box is the default even when omitted)
 - `BOX_API_KEY`, unless the key is stored in the Supabase managed-secret bridge
 

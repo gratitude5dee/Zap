@@ -20,7 +20,7 @@ Auth posture:
 - Studio, the user secret vault, and WZRD Cloud spend require a verified `wallet:0x…` principal. Anonymous/self-hosted BYOK remains supported.
 - Credential resolution is request-scoped BYOK, then the signed-in user's encrypted Supabase vault, then wallet-metered WZRD Cloud. Sources never mix within one provider call.
 - Provider webhooks require `ZAP_PROVIDER_WEBHOOK_SECRET` in production; hosted publishing requires `ZAP_PUBLISH_TOKEN`.
-- Poll drain uses `ZAP_POLL_DRAIN_SECRET`; Eve accepts Supabase sessions, Vercel OIDC, local dev, or `ZAP_AGENT_TOKEN`.
+- The legacy Convex poll drain uses `ZAP_POLL_DRAIN_SECRET`; Vercel Cron calls the same bounded queue drain every two minutes through `/api/cron/provider-poll` and `CRON_SECRET`. Eve accepts Supabase sessions, Vercel OIDC, local dev, or `ZAP_AGENT_TOKEN`.
 
 Machine surfaces:
 
