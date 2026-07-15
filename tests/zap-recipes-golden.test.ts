@@ -5,7 +5,7 @@ import { createZapRunTicket } from "../lib/zap-runner-server";
 import { loadZapSpec } from "../lib/zap-files";
 
 describe("packaged Zap recipe golden dry-runs", () => {
-  it("plans every packaged Zap with synthetic inputs", async () => {
+  it("plans every public packaged Zap with synthetic inputs", async () => {
     const slugs = await listZapSlugs();
 
     expect(slugs.length).toBeGreaterThan(0);
@@ -30,10 +30,12 @@ describe("packaged Zap recipe golden dry-runs", () => {
 async function listZapSlugs() {
   const skillsDir = path.join(process.cwd(), "agent", "skills");
   const entries = await fs.readdir(skillsDir, { withFileTypes: true });
-  return entries
+  const slugs = entries
     .filter((entry) => entry.isDirectory() && entry.name.startsWith("zap-"))
     .map((entry) => entry.name.slice("zap-".length))
     .sort();
+  const specs = await Promise.all(slugs.map((slug) => loadZapSpec(slug)));
+  return slugs.filter((_, index) => specs[index]?.publish?.visibility !== "private");
 }
 
 function buildSyntheticInputs(spec: NonNullable<Awaited<ReturnType<typeof loadZapSpec>>>) {

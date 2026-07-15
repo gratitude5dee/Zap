@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { planZapRun } from "../packages/core/src/planner";
 import { parseZapMarkdown } from "../packages/core/src/schema";
 import { listProviderAdapters } from "@wzrdtech/providers";
 
 describe("platform core", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("parses HyperFrames stitch settings", () => {
     const zap = parseZapMarkdown(`---
 zap: hyperframes-demo
@@ -67,6 +71,29 @@ steps:
 
     const plan = planZapRun(zap, 5);
     expect(plan.steps.map((step) => step.id)).toEqual(["extend_1", "extend_2", "stitch"]);
+  });
+
+  it("requires an operator-configured price for Seedance Fast", () => {
+    const zap = parseZapMarkdown(`---
+zap: air-test
+version: 2
+description: test
+budget:
+  estimate_usd: 0
+  cap_usd: 5
+steps:
+  - id: seedance
+    kind: video.gen
+    model: seedance-2-0-fast-260128
+    duration_s: 5
+---
+`);
+
+    vi.stubEnv("GMI_SEEDANCE_FAST_USD_PER_SECOND", "");
+    expect(() => planZapRun(zap, 0)).toThrow(/GMI_SEEDANCE_FAST_USD_PER_SECOND/);
+
+    vi.stubEnv("GMI_SEEDANCE_FAST_USD_PER_SECOND", "0.2");
+    expect(planZapRun(zap, 0).estimateUsd).toBeCloseTo(1);
   });
 
   it("exports only live BYOK provider adapters", () => {

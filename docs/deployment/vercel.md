@@ -11,6 +11,7 @@ The production project is `zap`, with Node `24.x`.
 - Set `ZAP_PUBLISH_TOKEN`; `POST /api/zaps/publish` fails closed in production when it is missing.
 - Set `ZAP_AGENT_TOKEN` if non-browser operators or MCP clients need to call Eve without a Supabase user session.
 - Set `ZAP_POLL_DRAIN_URL` to the deployed `/api/providers/poll/drain` URL.
-- Set `ZAP_POLL_DRAIN_SECRET` in both Convex and Vercel if the drain endpoint is protected.
+- Set `ZAP_POLL_DRAIN_SECRET` in both Convex and Vercel only when retaining the legacy Convex trigger.
+- Set a distinct `CRON_SECRET`. Vercel invokes `GET /api/cron/provider-poll` every two minutes with `Authorization: Bearer $CRON_SECRET`; its bounded, idempotent drain is the production fallback when Convex is unavailable.
 
 User provider keys belong in Supabase, not Vercel env vars.

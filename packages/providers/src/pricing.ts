@@ -1,7 +1,20 @@
 import type { GenRequest } from "./types.ts";
 import { ProviderError } from "./errors.ts";
 
-export const modelRates: Record<string, { perMegapixel?: number; perRequest?: number; perSecond?: number }> = {
+export type ModelRate = { perMegapixel?: number; perRequest?: number; perSecond?: number };
+
+/**
+ * GMI publishes the current Seedance Fast rate in its authenticated console.
+ * Keep the model in the registry, but do not embed a stale public price in a
+ * deployable bundle. An operator must set this value from the current console
+ * before the model can be planned or submitted.
+ */
+export const SEEDANCE_FAST_MODEL = "seedance-2-0-fast-260128";
+export const operatorPricedModels: Readonly<Record<string, { environmentVariable: string }>> = {
+  [SEEDANCE_FAST_MODEL]: { environmentVariable: "GMI_SEEDANCE_FAST_USD_PER_SECOND" },
+};
+
+export const modelRates: Record<string, ModelRate> = {
   "amazon.nova-canvas-v1:0": { perRequest: 0.04 },
   "amazon.nova-reel-v1:0": { perSecond: 0.12 },
   "amazon.nova-reel-v1:1": { perSecond: 0.12 },
@@ -23,7 +36,7 @@ export const modelRates: Record<string, { perMegapixel?: number; perRequest?: nu
 };
 
 export function priceGeneration(req: GenRequest) {
-  const rate = modelRates[req.model];
+  const rate = modelRateFor(req.model);
   if (!rate) {
     throw new ProviderError(`No pricing is configured for model ${req.model}.`, {
       code: "PRICE_UNKNOWN",
@@ -36,5 +49,28 @@ export function priceGeneration(req: GenRequest) {
 }
 
 export function listModelRates() {
-  return Object.entries(modelRates).map(([model, rate]) => ({ model, ...rate }));
+  return Object.entries({
+    ...modelRates,
+    ...configuredOperatorModelRates(),
+  }).map(([model, rate]) => ({ model, ...rate }));
+}
+
+export function modelRateFor(model: string): ModelRate | undefined {
+  return modelRates[model] ?? configuredOperatorModelRates()[model];
+}
+
+function configuredOperatorModelRates(): Record<string, ModelRate> {
+  const configured: Record<string, ModelRate> = {};
+  for (const [model, { environmentVariable }] of Object.entries(operatorPricedModels)) {
+    const perSecond = readPositiveEnvironmentRate(environmentVariable);
+    if (perSecond !== undefined) configured[model] = { perSecond };
+  }
+  return configured;
+}
+
+function readPositiveEnvironmentRate(name: string) {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
 }

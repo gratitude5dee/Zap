@@ -17,7 +17,7 @@ import {
   upsertStepLedger,
   type RunSnapshot,
 } from "./run-ledger";
-import { loadZapSpec, readPrompt } from "./zap-files";
+import { loadPublicZapSpec, loadZapSpec, readPrompt } from "./zap-files";
 import { defaultProviderModel, pollGeneration, quoteGeneration, submitGeneration } from "./providers/router";
 import {
   revealManagedProviderSecrets,
@@ -105,7 +105,7 @@ export async function createZapRunTicket({
   userAccessToken,
   userId,
 }: RunZapInput): Promise<{ execution?: ZapExecutionTicket; response: RunZapResponse }> {
-  const zap = await loadZapSpec(slug, principalId);
+  const zap = await loadPublicZapSpec(slug, principalId);
   if (!zap) {
     throw new ZapRunError({
       code: "UNKNOWN_ZAP",

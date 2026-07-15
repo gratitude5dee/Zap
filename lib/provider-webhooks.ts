@@ -1,4 +1,12 @@
 import type { ProviderPollResult } from "./provider-types";
+import { AirVideoOutputError, persistAirVideoOutput } from "./blob-store";
+import {
+  recordAirVideoFailure,
+  recordAirVideoAssetExpiry,
+  releaseAirVideoConcurrency,
+  scheduleAirVideoAssetCleanup,
+  touchAirVideoConcurrency,
+} from "./air-video-service";
 import { getRedis } from "./redis";
 import { addAssetLedger, getRunSnapshot, updateRunLedger, upsertStepLedger } from "./run-ledger";
 import { getProviderAdapter } from "@wzrdtech/providers";
@@ -29,12 +37,15 @@ export function buildProviderWebhookUrl(provider: string, meta: Required<Pick<Pr
 }
 
 export async function recordProviderWebhook(provider: ProviderWebhookProvider, payload: unknown, source: ProviderWebhookSource = {}) {
+  const parsed = getProviderAdapter(provider).parseWebhook?.(payload, source.url) ?? parseProviderWebhook(payload, source.url);
   const redis = getRedis();
   if (redis) {
-    await redis.lpush(`zap:webhook:${provider}`, JSON.stringify({ payload, sourceUrl: source.url, ts: Date.now() }));
+    // Do not turn this diagnostic queue into a second copy of provider input.
+    // Webhook bodies and source URLs may carry prompts, signed media URLs, or
+    // our callback secret. The execution path uses `parsed` in memory below;
+    // Redis receives only an allowlisted audit summary.
+    await redis.lpush(`zap:webhook:${provider}`, JSON.stringify(providerWebhookAuditRecord(provider, parsed)));
   }
-
-  const parsed = getProviderAdapter(provider).parseWebhook?.(payload, source.url) ?? parseProviderWebhook(payload, source.url);
   return recordProviderProgress(provider, parsed, parsed);
 }
 
@@ -63,12 +74,86 @@ export async function recordProviderProgress(provider: ProviderWebhookProvider |
   }
 
   const existingStep = snapshot.steps.find((step) => step.stepId === meta.stepId);
-  const status = result.status === "failed" ? "failed" : result.status === "done" ? "done" : result.status === "queued" ? "queued" : "running";
-  const progress = result.progress ?? (status === "done" || status === "failed" ? 1 : status === "queued" ? 0 : 0.5);
+  const isAirVideoRun = /^air_[a-f0-9]{24}$/.test(meta.runId);
+  // Provider webhooks and polling are at-least-once. Never let a stale
+  // queued/running callback regress a terminal artifact or trigger a second
+  // Blob copy.
+  if (existingStep && isTerminalStepStatus(existingStep.status)) {
+    if (isAirVideoRun) await releaseAirVideoConcurrency(meta.runId);
+    return {
+      observed: true,
+      provider,
+      requestId: meta.requestId,
+      runId: meta.runId,
+      status: existingStep.status,
+      stepId: meta.stepId,
+    };
+  }
+
+  let effectiveResult = result;
+  let storageKey: string | undefined;
+  let airAssetExpiresAtMs: number | undefined;
+  if (isAirVideoRun && result.status === "done") {
+    if (!result.outputUrl) {
+      effectiveResult = { ...result, error: "OUTPUT_MISSING", outputUrl: undefined, status: "failed" };
+    } else if (!(await acquireAirOutputLease(meta.runId))) {
+      // A second poll/webhook should retry after the first copier commits its
+      // ledger record, rather than racing a deterministic Blob pathname.
+      throw new Error("AIR_OUTPUT_PERSISTENCE_BUSY");
+    } else {
+      try {
+        const expiresAtMs = Date.now() + 24 * 60 * 60 * 1000;
+        const stored = await persistAirVideoOutput(result.outputUrl, `air/${meta.runId}/${meta.stepId}`, {
+          // This durable queue write happens before Blob.put. A process crash
+          // after the write therefore leaves a deletion plan for every object
+          // that may have been created, instead of an orphaned public MP4.
+          beforeBlobWrite: (plannedStorageKey) => scheduleAirVideoAssetCleanup(plannedStorageKey, expiresAtMs),
+        });
+        airAssetExpiresAtMs = expiresAtMs;
+        effectiveResult = { ...result, outputUrl: stored.url };
+        storageKey = stored.storageKey;
+      } catch (error) {
+        if (!(error instanceof AirVideoOutputError) || !error.deterministic) throw error;
+        // Air never sends a provider URL directly. Only deterministic media
+        // validation failures become a terminal generation failure.
+        effectiveResult = { ...result, error: "OUTPUT_VALIDATION_FAILED", outputUrl: undefined, status: "failed" };
+      }
+    }
+  }
+  const status = effectiveResult.status === "failed" ? "failed" : effectiveResult.status === "done" ? "done" : effectiveResult.status === "queued" ? "queued" : "running";
+  const progress = effectiveResult.progress ?? (status === "done" || status === "failed" ? 1 : status === "queued" ? 0 : 0.5);
+  // Provider errors are untrusted text. Persisting it in Convex can retain a
+  // prompt or signed first-frame URL long after the provider request expires.
+  const ledgerError = status === "failed" ? persistedProviderFailureCode(effectiveResult.error) : undefined;
+
+  // Air also mirrors terminal state in its private Redis record, so feed that
+  // contract the same categorized value that reaches the generic ledger.
+  if (isAirVideoRun && status === "failed") {
+    await recordAirVideoFailure(meta.runId, ledgerError);
+  }
+
+  let assetId: string | undefined;
+  // The asset is durable before the step is marked done. This leaves a retry
+  // path if a process stops between Blob persistence and ledger completion.
+  if (status === "done" && effectiveResult.outputUrl) {
+    assetId = await addAssetLedger({
+      kind: inferAssetKind(effectiveResult.outputUrl),
+      parents: [],
+      runId: meta.runId,
+      stepId: meta.stepId,
+      storageKey,
+      url: effectiveResult.outputUrl,
+    });
+    if (isAirVideoRun && storageKey && airAssetExpiresAtMs) {
+      // Cleanup was durably scheduled before Blob.put; persist the matching
+      // public capability expiry before publishing the terminal step state.
+      await recordAirVideoAssetExpiry(meta.runId, airAssetExpiresAtMs);
+    }
+  }
 
   await upsertStepLedger({
-    actualUsd: result.actualUsd ?? existingStep?.actualUsd,
-    error: result.error ?? existingStep?.error,
+    actualUsd: effectiveResult.actualUsd ?? existingStep?.actualUsd,
+    error: ledgerError,
     kind: existingStep?.kind ?? meta.capability ?? "unknown",
     model: existingStep?.model,
     priceQuoteUsd: existingStep?.priceQuoteUsd ?? 0,
@@ -80,29 +165,23 @@ export async function recordProviderProgress(provider: ProviderWebhookProvider |
     stepId: meta.stepId,
   });
 
-  let assetId: string | undefined;
-  if (status === "done" && result.outputUrl) {
-    assetId = await addAssetLedger({
-      kind: inferAssetKind(result.outputUrl),
-      parents: [],
-      runId: meta.runId,
-      stepId: meta.stepId,
-      url: result.outputUrl,
-    });
-  }
-
   const nextSnapshot = await getRunSnapshot(meta.runId);
   const costUsd = nextSnapshot.steps.reduce((sum, step) => sum + (step.actualUsd ?? (step.status === "done" ? step.priceQuoteUsd : 0)), 0);
   const allStepsTerminal = nextSnapshot.steps.length > 0 && nextSnapshot.steps.every((step) => step.status === "done" || step.status === "skipped");
   const runStatus = status === "failed" ? "failed" : allStepsTerminal ? "done" : "running";
   await updateRunLedger({
     costUsd,
-    error: status === "failed" ? result.error : nextSnapshot.run?.error,
+    error: ledgerError,
     runId: meta.runId,
     stage: status === "failed" ? `${meta.stepId}:failed` : allStepsTerminal ? "complete" : `${meta.stepId}:webhook_${status}`,
     status: runStatus,
-    zapUrl: allStepsTerminal ? result.outputUrl ?? nextSnapshot.run?.zapUrl : nextSnapshot.run?.zapUrl,
+    zapUrl: allStepsTerminal ? effectiveResult.outputUrl ?? nextSnapshot.run?.zapUrl : nextSnapshot.run?.zapUrl,
   });
+
+  if (isAirVideoRun) {
+    if (status === "done" || status === "failed") await releaseAirVideoConcurrency(meta.runId);
+    else await touchAirVideoConcurrency(meta.runId);
+  }
 
   return {
     assetId,
@@ -114,6 +193,68 @@ export async function recordProviderProgress(provider: ProviderWebhookProvider |
     stepId: meta.stepId,
   };
 }
+
+/**
+ * A bounded webhook audit record. Keep raw payloads/source URLs out of Redis:
+ * both can contain user prompts, first-frame capabilities, or callback
+ * secrets. This queue is observational only; it is not used to replay work.
+ */
+function providerWebhookAuditRecord(provider: ProviderWebhookProvider, parsed: ProviderPollResult & ProviderProgressMeta) {
+  const errorCode = parsed.status === "failed" ? persistedProviderFailureCode(parsed.error) : undefined;
+  return {
+    event: "provider_progress",
+    hasOutput: Boolean(parsed.outputUrl),
+    ...(typeof parsed.actualUsd === "number" && Number.isFinite(parsed.actualUsd) ? { actualUsd: parsed.actualUsd } : {}),
+    ...(safeCapability(parsed.capability) ? { capability: parsed.capability } : {}),
+    ...(errorCode ? { errorCode } : {}),
+    ...(safeRunId(parsed.runId) ? { runId: parsed.runId } : {}),
+    ...(safeStepId(parsed.stepId) ? { stepId: parsed.stepId } : {}),
+    provider,
+    status: parsed.status,
+    ts: Date.now(),
+  };
+}
+
+function safeCapability(value?: string) {
+  return Boolean(value && /^(?:audio|image|video)\.[a-z_]+$/.test(value));
+}
+
+function safeRunId(value?: string) {
+  return Boolean(value && /^(?:air_[a-f0-9]{24}|run_[A-Za-z0-9_-]{1,128})$/.test(value));
+}
+
+function safeStepId(value?: string) {
+  return Boolean(value && /^[A-Za-z0-9:_-]{1,128}$/.test(value));
+}
+
+// This boundary must not trust a provider adapter to have already normalized
+// diagnostics. Preserve only codes deliberately used by Zap; everything else
+// becomes the generic category rather than durable provider text.
+function persistedProviderFailureCode(value: unknown) {
+  const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
+  return persistedProviderFailureCodes.has(normalized) ? normalized : "PROVIDER_FAILED";
+}
+
+const persistedProviderFailureCodes = new Set([
+  "ADMISSION_UNAVAILABLE",
+  "CONCURRENCY_LIMIT",
+  "DAILY_SPEND_CAP",
+  "OUTPUT_MISSING",
+  "OUTPUT_VALIDATION_FAILED",
+  "PER_RUN_SPEND_CAP",
+  "POLL_DEADLINE_EXCEEDED",
+  "POLL_UNAVAILABLE",
+  "PROVIDER_AUTH_FAILED",
+  "PROVIDER_FAILED",
+  "PROVIDER_RATE_LIMITED",
+  "PROVIDER_REJECTED",
+  "PROVIDER_UNAVAILABLE",
+  "SERVICE_CONFIGURATION",
+  "SUBMISSION_PRECONDITION_FAILED",
+  "SUBMISSION_UNAVAILABLE",
+  "SUBMISSION_UNKNOWN",
+  "VIDEO_EXPIRED",
+]);
 
 function parseProviderWebhook(payload: unknown, sourceUrl?: string): ProviderPollResult & ProviderProgressMeta {
   const query = readQuery(sourceUrl);
@@ -174,6 +315,10 @@ function normalizeProgress(progress?: number) {
 
 function extractOutputUrl(payload: unknown) {
   return pickString(payload, [
+    ["outcome", "video_url"],
+    ["outcome", "videoUrl"],
+    ["outcome", "media_urls", "0", "url"],
+    ["outcome", "media_urls", "0"],
     ["outputUrl"],
     ["output_url"],
     ["videoUrl"],
@@ -229,6 +374,20 @@ function inferAssetKind(url: string) {
   if (lower.startsWith("data:audio/") || /\.(wav|mp3|m4a|aac)$/.test(lower)) return "wav";
   if (lower.endsWith(".json")) return "json";
   return "mp4";
+}
+
+function isTerminalStepStatus(status: string) {
+  return status === "done" || status === "failed" || status === "skipped" || status === "canceled";
+}
+
+async function acquireAirOutputLease(runId: string) {
+  const redis = getRedis();
+  if (!redis) throw new Error("Air output persistence requires Redis.");
+  const result = await redis.set(`zap:service:air:v1:output:${runId}`, "1", {
+    ex: 120,
+    nx: true,
+  });
+  return result === "OK";
 }
 
 function getPublicBaseUrl() {

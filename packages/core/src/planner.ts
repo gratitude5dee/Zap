@@ -1,5 +1,8 @@
 import type { ZapSpec, ZapStep } from "./schema.ts";
 
+const SEEDANCE_FAST_MODEL = "seedance-2-0-fast-260128";
+const SEEDANCE_FAST_RATE_ENVIRONMENT_VARIABLE = "GMI_SEEDANCE_FAST_USD_PER_SECOND";
+
 export type PlannedZapStep = ZapStep & {
   originalId: string;
   repeatIndex?: number;
@@ -56,10 +59,27 @@ export function isLocalStep(step: ZapStep) {
 export function quoteStep(step: ZapStep) {
   if (isLocalStep(step)) return 0;
   const model = step.model ?? "local";
+  if (model === SEEDANCE_FAST_MODEL) {
+    const perSecond = configuredSeedanceFastRate();
+    if (perSecond === undefined) {
+      throw new Error(
+        `No pricing is configured for model ${SEEDANCE_FAST_MODEL}. `
+        + `Set ${SEEDANCE_FAST_RATE_ENVIRONMENT_VARIABLE} from the current GMI console before planning it.`,
+      );
+    }
+    return perSecond * (step.duration_s ?? 1);
+  }
   const rate = modelRates[model];
   if (!rate) return 0;
   if (rate.perRequest !== undefined) return rate.perRequest;
   return (rate.perSecond ?? 0) * (step.duration_s ?? 1);
+}
+
+function configuredSeedanceFastRate() {
+  const raw = process.env[SEEDANCE_FAST_RATE_ENVIRONMENT_VARIABLE]?.trim();
+  if (!raw) return undefined;
+  const rate = Number(raw);
+  return Number.isFinite(rate) && rate > 0 ? rate : undefined;
 }
 
 export function expandRepeatSteps(zap: ZapSpec, extendCount: number): PlannedZapStep[] {
