@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#05070a" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>WZRD — Offline</title>
+    <style>
+      :root { color-scheme: dark; background: #05070a; }
+      * { box-sizing: border-box; }
+      body {
+        align-items: center;
+        background: #05070a;
+        color: #edf5ff;
+        display: flex;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        justify-content: center;
+        margin: 0;
+        min-height: 100dvh;
+        padding: max(2rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right)) max(2rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
+        text-align: center;
+      }
+      main { max-width: 24rem; }
+      img { height: 5rem; margin-bottom: 1.5rem; width: 5rem; }
+      p { color: rgba(237, 245, 255, 0.68); line-height: 1.6; margin: 0.75rem 0 1.5rem; }
+      a {
+        border: 1px solid rgba(123, 215, 255, 0.45);
+        color: #dff6ff;
+        display: inline-flex;
+        font-weight: 700;
+        padding: 0.75rem 1rem;
+        text-decoration: none;
+      }
+      a:focus-visible { outline: 3px solid #7bd7ff; outline-offset: 4px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/icon-192.png" width="192" height="192" alt="WZRD" />
+      <h1>WZRD is offline</h1>
+      <p>Reconnect to continue using the Zap agent media runtime.</p>
+      <a href="/">Try again</a>
+    </main>
+  </body>
+</html>
